@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -18,6 +20,7 @@ public class AuthController : ControllerBase
     private readonly IDiscordOAuthService _discord;
     private readonly IGoogleOAuthService _google;
     private readonly ISteamAuthService _steam;
+    private readonly ISteamOpenIdStateStore _steamState;
     private readonly IPasswordAuthService _passwordAuth;
     private readonly IJwtTokenService _jwt;
     private readonly AppDbContext _db;
@@ -31,6 +34,7 @@ public class AuthController : ControllerBase
         IDiscordOAuthService discord,
         IGoogleOAuthService google,
         ISteamAuthService steam,
+        ISteamOpenIdStateStore steamState,
         IPasswordAuthService passwordAuth,
         IJwtTokenService jwt,
         AppDbContext db,
@@ -43,6 +47,7 @@ public class AuthController : ControllerBase
         _discord = discord;
         _google = google;
         _steam = steam;
+        _steamState = steamState;
         _passwordAuth = passwordAuth;
         _jwt = jwt;
         _db = db;
@@ -52,6 +57,8 @@ public class AuthController : ControllerBase
         _steamOptions = steamOptions.Value;
         _logger = logger;
     }
+
+    private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
 
     // ---------- Email + password ----------
 
@@ -234,14 +241,55 @@ public class AuthController : ControllerBase
     }
 
     // ---------- Steam (OpenID 2.0) ----------
+    //
+    // OpenID 2.0 has no `state` param, so CSRF protection and login-vs-link intent both ride
+    // inside a single-use nonce embedded in `openid.return_to` (see SteamOpenIdStateStore) — it's
+    // inside Steam's signed field set, so it can't be tampered with in transit. The rw_oauth_state
+    // cookie used by Discord/Google is layered on top as a secondary check when present, but isn't
+    // required, since Steam's redirect chain is the primary defence here.
 
     [HttpGet("steam/login")]
-    public IActionResult SteamLogin()
+    public async Task<IActionResult> SteamLogin()
     {
         if (!_steam.IsConfigured)
-            return BadRequest("Steam login is not configured on this server (missing Steam Web API key).");
+            return BadRequest("Steam login is not enabled on this server.");
 
-        return Redirect(_steam.BuildAuthorizeUrl(_steamOptions.ReturnUrl, _steamOptions.Realm));
+        var nonce = await _steamState.IssueAsync(SteamAuthPurpose.Login);
+        SetStateCookie(nonce);
+        return Redirect(_steam.BuildAuthorizeUrl(_steamOptions.ReturnUrl, _steamOptions.Realm, nonce));
+    }
+
+    /// <summary>Attaches Steam to the caller's already-signed-in account. A top-level browser
+    /// redirect can't carry a bearer header, so which account this is for has to be pre-encoded
+    /// in the nonce rather than read off the request when Steam redirects back.</summary>
+    [HttpPost("steam/link/start")]
+    [Authorize]
+    public async Task<ActionResult<SteamLinkStartResponse>> SteamLinkStart()
+    {
+        if (!_steam.IsConfigured)
+            return BadRequest("Steam login is not enabled on this server.");
+
+        var nonce = await _steamState.IssueAsync(SteamAuthPurpose.Link, CurrentUserId);
+        SetStateCookie(nonce);
+        return new SteamLinkStartResponse(_steam.BuildAuthorizeUrl(_steamOptions.ReturnUrl, _steamOptions.Realm, nonce));
+    }
+
+    [HttpDelete("steam/link")]
+    [Authorize]
+    public async Task<IActionResult> SteamUnlink(CancellationToken ct)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == CurrentUserId, ct);
+        if (user is null) return NotFound();
+
+        if (user.SteamId is null) return NoContent();
+
+        if (user.PasswordHash is null && user.DiscordId is null && user.GoogleId is null)
+            return BadRequest("Steam is your only way to sign in — link another method before unlinking it.");
+
+        user.SteamId = null;
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
     }
 
     [HttpGet("steam/callback")]
@@ -249,42 +297,102 @@ public class AuthController : ControllerBase
     {
         var query = Request.Query.ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
 
-        var steamId = await _steam.VerifyAndGetSteamIdAsync(query, ct);
-        if (steamId is null)
+        var verification = await _steam.VerifyAsync(query, ct);
+        if (verification is null)
             return BadRequest("Steam login could not be verified.");
 
-        var profile = await _steam.GetPlayerSummaryAsync(steamId, ct);
-        var username = profile?.PersonaName ?? $"SteamUser{steamId[^6..]}";
-        var avatarUrl = profile?.AvatarUrl;
+        var state = await _steamState.ConsumeAsync(verification.ReturnToState);
+        if (state is null)
+            return BadRequest("This Steam login link has expired or was already used — try signing in again.");
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.SteamId == steamId, ct);
+        // Secondary check: if the cookie made it back, it must agree with the nonce Steam signed.
+        // Its absence isn't fatal (some browsers drop it across the cross-site redirect), since
+        // the Redis-backed single-use nonce above is what's actually load-bearing here.
+        if (Request.Cookies.TryGetValue(StateCookieName, out var cookieState) && cookieState != verification.ReturnToState)
+            return BadRequest("Invalid OAuth state.");
+        Response.Cookies.Delete(StateCookieName);
 
-        if (user is null)
+        if (!await _steamState.MarkNonceUsedOnceAsync(verification.ResponseNonce))
+            return BadRequest("This Steam login response was already used.");
+
+        var steamId = verification.SteamId64;
+
+        if (state.Purpose == SteamAuthPurpose.Link)
         {
-            user = new User
+            var linkUserId = state.LinkUserId!.Value;
+            var owner = await _db.Users.FirstOrDefaultAsync(u => u.SteamId == steamId, ct);
+            if (owner is not null && owner.Id != linkUserId)
+                return Redirect(BuildFrontendErrorRedirect(_steamOptions.FrontendCallbackUrl, "steam_already_linked"));
+
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == linkUserId, ct);
+            if (user is null) return NotFound();
+
+            user.SteamId = steamId;
+            var profile = await _steam.GetPlayerSummaryAsync(steamId, ct);
+            user.AvatarUrl ??= profile?.AvatarUrl;
+            user.UpdatedAt = DateTimeOffset.UtcNow;
+
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                // Race backstop: two link attempts for the same SteamId landed concurrently.
+                return Redirect(BuildFrontendErrorRedirect(_steamOptions.FrontendCallbackUrl, "steam_already_linked"));
+            }
+
+            // Already signed in — no tokens to hand back, just land on settings.
+            return Redirect($"{_steamOptions.FrontendCallbackUrl.Replace("/auth/callback", "/settings")}?linked=steam");
+        }
+
+        // Purpose.Login — deliberately no auto-link by email or anything else: Steam gives us no
+        // verifiable email to link on, unlike Google. An email-registered user who clicks "Sign in
+        // with Steam" gets a second account; linking Steam to an existing account is a separate,
+        // explicit action via steam/link/start.
+        var loginUser = await _db.Users.FirstOrDefaultAsync(u => u.SteamId == steamId, ct);
+        var loginProfile = await _steam.GetPlayerSummaryAsync(steamId, ct);
+        var username = loginProfile?.PersonaName ?? $"SteamUser{steamId[^6..]}";
+        var avatarUrl = loginProfile?.AvatarUrl;
+
+        if (loginUser is null)
+        {
+            loginUser = new User
             {
                 SteamId = steamId,
                 Username = username,
                 AvatarUrl = avatarUrl,
                 LastLoginAt = DateTimeOffset.UtcNow,
             };
-            _db.Users.Add(user);
-            _db.UserProfiles.Add(new UserProfile { UserId = user.Id, DisplayName = username });
-            _db.UserSettings.Add(new UserSettings { UserId = user.Id });
+            _db.Users.Add(loginUser);
+            _db.UserProfiles.Add(new UserProfile { UserId = loginUser.Id, DisplayName = username });
+            _db.UserSettings.Add(new UserSettings { UserId = loginUser.Id });
         }
         else
         {
-            user.Username = username;
-            user.AvatarUrl = avatarUrl ?? user.AvatarUrl;
-            user.UpdatedAt = DateTimeOffset.UtcNow;
-            user.LastLoginAt = DateTimeOffset.UtcNow;
+            loginUser.Username = username;
+            loginUser.AvatarUrl = avatarUrl ?? loginUser.AvatarUrl;
+            loginUser.UpdatedAt = DateTimeOffset.UtcNow;
+            loginUser.LastLoginAt = DateTimeOffset.UtcNow;
         }
 
         await _db.SaveChangesAsync(ct);
 
-        var tokens = await IssueTokenPairAsync(user, ct);
+        var tokens = await IssueTokenPairAsync(loginUser, ct);
         return Redirect(BuildFrontendRedirect(_steamOptions.FrontendCallbackUrl, tokens));
     }
+
+    private void SetStateCookie(string state) =>
+        Response.Cookies.Append(StateCookieName, state, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            Expires = DateTimeOffset.UtcNow.AddMinutes(10),
+        });
+
+    private static string BuildFrontendErrorRedirect(string frontendCallbackUrl, string error) =>
+        $"{frontendCallbackUrl}?error={Uri.EscapeDataString(error)}";
 
     // ---------- Shared ----------
 

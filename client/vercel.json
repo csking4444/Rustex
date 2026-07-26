@@ -2,7 +2,9 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "_comment_rewrites": "Order matters — Vercel takes the first match. The /api rule MUST stay above the SPA catch-all, or /api/auth/steam/login serves index.html and every OAuth redirect breaks. Set API_ORIGIN to the deployed API's origin (no trailing slash).",
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "$API_ORIGIN/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

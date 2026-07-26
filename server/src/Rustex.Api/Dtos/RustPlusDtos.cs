@@ -2,11 +2,6 @@ namespace Rustex.Api.Dtos;
 
 public record CreateRustPlusPairingRequest(ulong PlayerId, string PlayerToken, string ServerIp, int ServerPort);
 
-/// <summary>SteamAuthTicketHex must come from the user's own Steam client (a session auth
-/// ticket for AppID 252490 / Rust) — see docs/RUSTPLUS.md for why this can't be generated
-/// server-side.</summary>
-public record AutoPairRequest(string SteamAuthTicketHex);
-
 public record RustPlusPairingResponse(
     Guid Id,
     Guid ServerId,

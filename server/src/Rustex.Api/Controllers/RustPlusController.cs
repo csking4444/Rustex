@@ -2,22 +2,19 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Rustex.Api.Dtos;
 using Rustex.Domain.Entities;
 using Rustex.Infrastructure.Persistence;
 using Rustex.Infrastructure.RustPlus;
-using Rustex.Infrastructure.RustPlus.Fcm;
 using Rustex.Infrastructure.Security;
 
 namespace Rustex.Api.Controllers;
 
 /// <summary>
-/// Manual Rust+ pairing (Stage A) — the user supplies a (playerId, playerToken) obtained some
-/// other way (a community pairing tool, or eventually this app's own Stage B auto-pairing once
-/// that's working). Once paired, this exposes GetTeamInfo and vending-machine map markers live
-/// from the game server. See docs/ARCHITECTURE.md for the honesty note on what's verified vs.
-/// best-effort in this subsystem.
+/// Manual Rust+ pairing — the user supplies a (playerId, playerToken) obtained some other way (a
+/// community pairing tool, or the Rustex "Log In &amp; Pair" flow once RustPlusAccountController
+/// exists). Once paired, this exposes GetTeamInfo and vending-machine map markers live from the
+/// game server. See docs/RUSTPLUS.md for what's verified vs. best-effort in this subsystem.
 /// </summary>
 [ApiController]
 [Route("api/servers/{serverId:guid}/rustplus")]
@@ -28,21 +25,15 @@ public class RustPlusController : ControllerBase
 
     private readonly AppDbContext _db;
     private readonly RustPlusConnectionManager _connectionManager;
-    private readonly RustPlusAutoPairingSession _autoPairingSession;
-    private readonly RustPlusOptions _rustPlusOptions;
     private readonly IEncryptionService? _encryption;
 
     public RustPlusController(
         AppDbContext db,
         RustPlusConnectionManager connectionManager,
-        RustPlusAutoPairingSession autoPairingSession,
-        IOptions<RustPlusOptions> rustPlusOptions,
         IEncryptionService? encryption = null)
     {
         _db = db;
         _connectionManager = connectionManager;
-        _autoPairingSession = autoPairingSession;
-        _rustPlusOptions = rustPlusOptions.Value;
         _encryption = encryption;
     }
 
@@ -88,54 +79,15 @@ public class RustPlusController : ControllerBase
     }
 
     /// <summary>
-    /// Experimental — see docs/RUSTPLUS.md. Opens an FCM/MCS session and waits (up to 2 minutes)
-    /// for the player to run "app.pair" while looking at this server in-game, then saves the
-    /// resulting pairing automatically. Requires RustPlus:FcmSenderId to be configured and
-    /// RustPlus:EnableAutoPairing to be true. The caller must supply a Steam auth session ticket
-    /// obtained from their own Steam client — this endpoint cannot mint one itself.
+    /// Superseded — the old per-request Steam-auth-ticket auto-pair flow (which blocked an HTTP
+    /// request for up to two minutes) has been replaced by a one-time local setup: run
+    /// `rustex-pair` once, then pair any server from the in-game Rust+ pause-menu tab. See
+    /// docs/RUSTPLUS.md and POST /api/rustplus/link-codes.
     /// </summary>
     [HttpPost("auto-pair")]
-    public async Task<ActionResult<RustPlusPairingResponse>> AutoPair(Guid serverId, [FromBody] AutoPairRequest request, CancellationToken ct)
-    {
-        if (!_rustPlusOptions.EnableAutoPairing)
-            return StatusCode(503, "Auto-pairing is disabled (RustPlus:EnableAutoPairing). It's experimental and unverified — see docs/RUSTPLUS.md. Use manual pairing (POST pairing) instead.");
-
-        if (_encryption is null)
-            return StatusCode(503, "This server has no Encryption:FieldKey configured, so Rust+ tokens can't be stored securely.");
-
-        var ownsServer = await _db.RustServers.AnyAsync(s => s.Id == serverId && s.OwnerUserId == CurrentUserId, ct);
-        if (!ownsServer) return NotFound();
-
-        RustPlusAutoPairingResult result;
-        try
-        {
-            result = await _autoPairingSession.WaitForPairingAsync(request.SteamAuthTicketHex, TimeSpan.FromMinutes(2), ct);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(502, $"Auto-pairing failed or timed out: {ex.Message}. See docs/RUSTPLUS.md — this path is experimental.");
-        }
-
-        var userId = CurrentUserId;
-        var pairing = await _db.RustPlusPairings.FirstOrDefaultAsync(p => p.ServerId == serverId && p.UserId == userId, ct);
-        if (pairing is null)
-        {
-            pairing = new RustPlusPairing { UserId = userId, ServerId = serverId };
-            _db.RustPlusPairings.Add(pairing);
-        }
-        else
-        {
-            await _connectionManager.DropAsync(pairing.Id);
-        }
-
-        pairing.PlayerId = result.PlayerId;
-        pairing.PlayerTokenEncrypted = _encryption.Encrypt(result.PlayerToken);
-        pairing.ServerIp = result.ServerIp;
-        pairing.ServerPort = result.ServerPort;
-
-        await _db.SaveChangesAsync(ct);
-        return ToResponse(pairing);
-    }
+    [Obsolete("Replaced by the rustex-pair local helper + RustPlusAccountController.")]
+    public IActionResult AutoPair(Guid serverId) =>
+        StatusCode(410, "Auto-pairing moved — see /settings/rust-plus to generate a one-time setup code, then run `rustex-pair`. Manual pairing (POST pairing) still works as before.");
 
     [HttpDelete("pairing")]
     public async Task<IActionResult> DeletePairing(Guid serverId, CancellationToken ct)

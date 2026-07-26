@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Bell, Moon, Save } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Bell, Link2, Moon, Save } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { SkeletonList } from "@/components/ui/Skeleton";
+import { useAuth } from "@/context/AuthContext";
 import { useUpdateUserSettings, useUserSettings } from "@/hooks/useUserSettings";
 import { subscribeToPush, unsubscribeFromPush } from "@/lib/webPush";
 
@@ -21,6 +23,25 @@ const TIMEZONES = ["UTC", "America/New_York", "America/Chicago", "America/Denver
 export default function SettingsPage() {
   const { data: settings, isLoading } = useUserSettings();
   const updateSettings = useUpdateUserSettings();
+  const { user, linkSteam, unlinkSteam } = useAuth();
+  const [searchParams] = useSearchParams();
+  const linked = searchParams.get("linked");
+  const [steamActionError, setSteamActionError] = useState<string | null>(null);
+  const [unlinkingSteam, setUnlinkingSteam] = useState(false);
+
+  async function handleUnlinkSteam() {
+    setSteamActionError(null);
+    setUnlinkingSteam(true);
+    try {
+      await unlinkSteam();
+    } catch (err) {
+      const message =
+        (err as { response?: { data?: string } })?.response?.data ?? "Couldn't unlink Steam — try again.";
+      setSteamActionError(typeof message === "string" ? message : "Couldn't unlink Steam — try again.");
+    } finally {
+      setUnlinkingSteam(false);
+    }
+  }
 
   const [form, setForm] = useState({
     soundEnabled: true,
@@ -88,6 +109,37 @@ export default function SettingsPage() {
 
       {!isLoading && (
         <>
+          {linked === "steam" && (
+            <p className="rounded-xl border border-success/30 bg-success/10 px-4 py-2 text-sm text-success">
+              Steam account linked.
+            </p>
+          )}
+
+          <Card>
+            <CardHeader title="Connected Accounts" subtitle="Sign-in methods linked to this account" />
+            <div className="flex items-center justify-between py-1">
+              <div className="flex items-start gap-3">
+                <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
+                <div>
+                  <p className="text-sm font-medium text-text-primary">Steam</p>
+                  <p className="text-xs text-text-muted">
+                    {user?.hasSteam ? "Linked — used to receive Rust+ pairing pushes too." : "Not linked."}
+                  </p>
+                </div>
+              </div>
+              {user?.hasSteam ? (
+                <button onClick={() => void handleUnlinkSteam()} disabled={unlinkingSteam} className="btn-secondary">
+                  {unlinkingSteam ? "Unlinking..." : "Unlink"}
+                </button>
+              ) : (
+                <button onClick={() => void linkSteam()} className="btn-secondary">
+                  Link Steam
+                </button>
+              )}
+            </div>
+            {steamActionError && <p className="mt-2 text-xs text-warning">{steamActionError}</p>}
+          </Card>
+
           <Card>
             <CardHeader title="Notification Channels" subtitle="Which channels deliver raid alerts" />
             <div className="flex flex-col divide-y divide-white/5">

@@ -14,6 +14,8 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   loginWithGoogle: () => void;
   loginWithSteam: () => void;
+  linkSteam: () => Promise<void>;
+  unlinkSteam: () => Promise<void>;
   registerWithPassword: (email: string, password: string, username: string) => Promise<void>;
   loginWithPassword: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -55,6 +57,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = `${import.meta.env.VITE_API_BASE_URL}/auth/steam/login`;
   }, []);
 
+  // Linking is a separate action from logging in: the account is already known (you're signed
+  // in), so the server pre-encodes that intent server-side and this just follows the redirect it
+  // hands back — unlike loginWithSteam, which is a plain navigation.
+  const linkSteam = useCallback(async () => {
+    const { data } = await apiClient.post<{ url: string }>("/auth/steam/link/start");
+    window.location.href = data.url;
+  }, []);
+
+  const unlinkSteam = useCallback(async () => {
+    await apiClient.delete("/auth/steam/link");
+    await fetchUser();
+  }, [fetchUser]);
+
   const registerWithPassword = useCallback(
     async (email: string, password: string, username: string) => {
       const { data } = await apiClient.post<TokenPair>("/auth/register", { email, password, username });
@@ -93,12 +108,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: user !== null,
       loginWithGoogle,
       loginWithSteam,
+      linkSteam,
+      unlinkSteam,
       registerWithPassword,
       loginWithPassword,
       logout,
       refetchUser: fetchUser,
     }),
-    [user, isLoading, loginWithGoogle, loginWithSteam, registerWithPassword, loginWithPassword, logout, fetchUser],
+    [
+      user,
+      isLoading,
+      loginWithGoogle,
+      loginWithSteam,
+      linkSteam,
+      unlinkSteam,
+      registerWithPassword,
+      loginWithPassword,
+      logout,
+      fetchUser,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

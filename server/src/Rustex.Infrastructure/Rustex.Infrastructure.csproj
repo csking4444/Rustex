@@ -29,8 +29,6 @@
 
   <ItemGroup>
     <Protobuf Include="RustPlus\Proto\rustplus.proto" ProtoRoot="RustPlus\Proto" CompileOutputs="true" />
-    <Protobuf Include="RustPlus\Fcm\Proto\checkin.proto" ProtoRoot="RustPlus\Fcm\Proto" CompileOutputs="true" />
-    <Protobuf Include="RustPlus\Fcm\Proto\mcs.proto" ProtoRoot="RustPlus\Fcm\Proto" CompileOutputs="true" />
   </ItemGroup>
 
 </Project>

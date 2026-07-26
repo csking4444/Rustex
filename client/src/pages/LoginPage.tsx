@@ -1,13 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ShieldAlert } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { RustexMark } from "@/components/brand/RustexMark";
 
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  steam_already_linked: "That Steam account is already linked to a different Rustex account.",
+};
+
 export default function LoginPage() {
   const { isAuthenticated, isLoading, loginWithGoogle, loginWithSteam, loginWithPassword, registerWithPassword } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -19,6 +24,11 @@ export default function LoginPage() {
   useEffect(() => {
     if (!isLoading && isAuthenticated) navigate("/dashboard", { replace: true });
   }, [isLoading, isAuthenticated, navigate]);
+
+  useEffect(() => {
+    const oauthError = searchParams.get("error");
+    if (oauthError) setError(OAUTH_ERROR_MESSAGES[oauthError] ?? "That sign-in method couldn't be linked.");
+  }, [searchParams]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

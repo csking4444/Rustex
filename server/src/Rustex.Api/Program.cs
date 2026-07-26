@@ -57,6 +57,7 @@ if (!string.IsNullOrWhiteSpace(encryptionKey))
 builder.Services.AddHttpClient<IDiscordOAuthService, DiscordOAuthService>();
 builder.Services.AddHttpClient<IGoogleOAuthService, GoogleOAuthService>();
 builder.Services.AddHttpClient<ISteamAuthService, SteamAuthService>();
+builder.Services.AddSingleton<ISteamOpenIdStateStore, SteamOpenIdStateStore>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddSingleton<IPasswordAuthService, PasswordAuthService>();
 
@@ -126,23 +127,10 @@ builder.Services.AddSingleton<IServerQueryClient, A2sQueryClient>();
 builder.Services.AddHostedService<ServerStatusPollingWorker>();
 
 builder.Services.AddSingleton<RustPlusConnectionManager>();
-
-// ---------- Rust+ Stage B: FCM auto-pairing (experimental — see docs/RUSTPLUS.md) ----------
-builder.Services.AddHttpClient<FcmCheckinClient>();
-builder.Services.AddHttpClient<FcmRegistrationClient>();
-builder.Services.AddHttpClient<FacepunchPushRegistrationClient>();
-builder.Services.AddTransient<McsClient>();
-builder.Services.AddTransient(sp =>
-{
-    var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<RustPlusOptions>>().Value;
-    return new RustPlusAutoPairingSession(
-        sp.GetRequiredService<FcmCheckinClient>(),
-        sp.GetRequiredService<FcmRegistrationClient>(),
-        sp.GetRequiredService<FacepunchPushRegistrationClient>(),
-        sp.GetRequiredService<McsClient>(),
-        options.FcmSenderId ?? "",
-        sp.GetRequiredService<ILogger<RustPlusAutoPairingSession>>());
-});
+// The FCM auto-pairing listener (Phase 5, gated on RustPlus:EnableFcmListener) registers itself
+// here once it exists. The old hand-rolled checkin/MCS stack was deleted — it was documented as
+// unverified and known-wrong (it sent a raw FCM token where Facepunch expects an Expo token).
+// See docs/RUSTPLUS.md and the plan at zany-napping-seal.md for the replacement design.
 
 builder.Services.AddSingleton<IClientConnectionRegistry, InMemoryClientConnectionRegistry>();
 builder.Services.AddHttpClient<IDiscordWebhookSender, DiscordWebhookSender>();

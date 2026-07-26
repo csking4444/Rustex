@@ -48,7 +48,22 @@ services:
       Discord__ClientSecret: "${DISCORD_CLIENT_SECRET:-}"
       Discord__RedirectUri: "${DISCORD_REDIRECT_URI:-http://localhost:8080/api/auth/discord/callback}"
       Discord__FrontendCallbackUrl: "${DISCORD_FRONTEND_CALLBACK_URL:-http://localhost:5173/auth/callback}"
+      Google__ClientId: "${GOOGLE_CLIENT_ID:-}"
+      Google__ClientSecret: "${GOOGLE_CLIENT_SECRET:-}"
+      Google__RedirectUri: "${GOOGLE_REDIRECT_URI:-http://localhost:8080/api/auth/google/callback}"
+      Google__FrontendCallbackUrl: "${GOOGLE_FRONTEND_CALLBACK_URL:-http://localhost:5173/auth/callback}"
+      # Steam ReturnUrl/Realm must match the origin the browser actually reaches this API on —
+      # that's the published port below, not the local dev-cert host in appsettings.json. Steam
+      # signs return_to, and the callback rejects a mismatch.
+      Steam__ApiKey: "${STEAM_API_KEY:-}"
+      Steam__ReturnUrl: "${STEAM_RETURN_URL:-http://localhost:8080/api/auth/steam/callback}"
+      Steam__Realm: "${STEAM_REALM:-http://localhost:8080}"
+      Steam__FrontendCallbackUrl: "${STEAM_FRONTEND_CALLBACK_URL:-http://localhost:5173/auth/callback}"
       Encryption__FieldKey: "${ENCRYPTION_FIELD_KEY:-}"
+      WebPush__PublicKey: "${WEBPUSH_PUBLIC_KEY:-}"
+      WebPush__PrivateKey: "${WEBPUSH_PRIVATE_KEY:-}"
+      WebPush__Subject: "${WEBPUSH_SUBJECT:-mailto:admin@example.com}"
+      RustPlus__EnableFcmListener: "${RUSTPLUS_ENABLE_FCM_LISTENER:-false}"
       Cors__AllowedOrigins__0: "${FRONTEND_ORIGIN:-http://localhost:5173}"
     ports:
       - "8080:8080"
