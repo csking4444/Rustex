@@ -1,0 +1,104 @@
+syntax = "proto2";
+package mcs_proto;
+option csharp_namespace = "Rustex.Infrastructure.RustPlus.Fcm.Proto";
+
+// Google's MCS (Mobile Connection Server) protocol, spoken over a persistent TLS socket to
+// mtalk.google.com:5228. This is the least-verified schema in the whole project — see
+// docs/RUSTPLUS.md. The *tag numbers* below (used in the wire framing, one byte per frame
+// identifying which message type follows) are a well-known, stable, publicly documented
+// constant list. The *field numbers inside* each message are best-effort and may not match
+// Google's real schema exactly.
+
+message HeartbeatPing {
+  optional int32 stream_id = 1;
+  optional int32 last_stream_id_received = 2;
+  optional int64 status = 3;
+}
+
+message HeartbeatAck {
+  optional int32 stream_id = 1;
+  optional int32 last_stream_id_received = 2;
+  optional int64 status = 3;
+}
+
+message ErrorInfo {
+  optional int32 code = 1;
+  optional string message = 2;
+  optional string type = 3;
+}
+
+message Setting {
+  optional string name = 1;
+  optional string value = 2;
+}
+
+message HeartbeatStat {
+  optional string ip = 1;
+  optional bool timeout = 2;
+  optional int32 interval_ms = 3;
+}
+
+message ClientEvent {
+  optional int32 type = 1;
+}
+
+message LoginRequest {
+  optional string id = 1;
+  optional string domain = 2;
+  optional string user = 3;
+  optional string resource = 4;
+  optional string auth_token = 5;
+  repeated Setting setting = 6;
+  optional string device_id = 7;
+  optional int64 last_rmq_id = 8;
+  optional int32 network_type = 9;
+  optional string account_id = 11;
+  optional AuthService auth_service = 12;
+  optional bool use_rmq2 = 13;
+  optional int64 client_event = 14;
+}
+
+message AuthService {
+  optional int32 service = 1;
+  optional string token = 2;
+}
+
+message LoginResponse {
+  optional string id = 1;
+  optional int64 server_timestamp = 2;
+  optional ErrorInfo error = 3;
+  repeated Setting setting = 4;
+}
+
+message Close {
+}
+
+message AppData {
+  optional string key = 1;
+  optional string value = 2;
+}
+
+// The actual push payload we care about — the Rust+ pairing event (server IP, port,
+// playerId/playerToken) arrives inside `app_data` key/value pairs on one of these.
+message DataMessageStanza {
+  optional string id = 2;
+  optional string from = 3;
+  optional string to = 4;
+  optional string category = 5;
+  optional string token = 6;
+  repeated AppData app_data = 7;
+  optional string persistent_id = 8;
+  optional int32 stream_id = 9;
+  optional int32 last_stream_id_received = 10;
+  optional string reg_id = 11;
+  optional int64 sent = 13;
+  optional int32 ttl = 14;
+  optional string raw_data = 15;
+}
+
+message IqStanza {
+  optional int32 type = 2;
+  optional string id = 3;
+  optional int32 stream_id = 8;
+  optional int32 last_stream_id_received = 9;
+}

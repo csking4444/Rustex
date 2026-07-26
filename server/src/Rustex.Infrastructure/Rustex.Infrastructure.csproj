@@ -19,10 +19,18 @@
     <PackageReference Include="WebPush" Version="1.0.12" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="8.0.8" />
+    <PackageReference Include="Google.Protobuf" Version="3.28.2" />
+    <PackageReference Include="Grpc.Tools" Version="2.66.0" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Rustex.Domain\Rustex.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="RustPlus\Proto\rustplus.proto" ProtoRoot="RustPlus\Proto" CompileOutputs="true" />
+    <Protobuf Include="RustPlus\Fcm\Proto\checkin.proto" ProtoRoot="RustPlus\Fcm\Proto" CompileOutputs="true" />
+    <Protobuf Include="RustPlus\Fcm\Proto\mcs.proto" ProtoRoot="RustPlus\Fcm\Proto" CompileOutputs="true" />
   </ItemGroup>
 
 </Project>

@@ -15,6 +15,8 @@ using Rustex.Infrastructure.EventIngestion;
 using Rustex.Infrastructure.Notifications;
 using Rustex.Infrastructure.Persistence;
 using Rustex.Infrastructure.Realtime;
+using Rustex.Infrastructure.RustPlus;
+using Rustex.Infrastructure.RustPlus.Fcm;
 using Rustex.Infrastructure.Security;
 using Rustex.Infrastructure.ServerQuery;
 using Serilog;
@@ -36,6 +38,7 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptio
 builder.Services.Configure<DiscordOAuthOptions>(builder.Configuration.GetSection(DiscordOAuthOptions.SectionName));
 builder.Services.Configure<GoogleOAuthOptions>(builder.Configuration.GetSection(GoogleOAuthOptions.SectionName));
 builder.Services.Configure<SteamAuthOptions>(builder.Configuration.GetSection(SteamAuthOptions.SectionName));
+builder.Services.Configure<RustPlusOptions>(builder.Configuration.GetSection(RustPlusOptions.SectionName));
 
 // ---------- Persistence ----------
 builder.Services.AddDbContext<AppDbContext>(opts =>
@@ -121,6 +124,25 @@ if (builder.Configuration.GetValue<bool>("Ingestion:EnableSimulator"))
 
 builder.Services.AddSingleton<IServerQueryClient, A2sQueryClient>();
 builder.Services.AddHostedService<ServerStatusPollingWorker>();
+
+builder.Services.AddSingleton<RustPlusConnectionManager>();
+
+// ---------- Rust+ Stage B: FCM auto-pairing (experimental — see docs/RUSTPLUS.md) ----------
+builder.Services.AddHttpClient<FcmCheckinClient>();
+builder.Services.AddHttpClient<FcmRegistrationClient>();
+builder.Services.AddHttpClient<FacepunchPushRegistrationClient>();
+builder.Services.AddTransient<McsClient>();
+builder.Services.AddTransient(sp =>
+{
+    var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<RustPlusOptions>>().Value;
+    return new RustPlusAutoPairingSession(
+        sp.GetRequiredService<FcmCheckinClient>(),
+        sp.GetRequiredService<FcmRegistrationClient>(),
+        sp.GetRequiredService<FacepunchPushRegistrationClient>(),
+        sp.GetRequiredService<McsClient>(),
+        options.FcmSenderId ?? "",
+        sp.GetRequiredService<ILogger<RustPlusAutoPairingSession>>());
+});
 
 builder.Services.AddSingleton<IClientConnectionRegistry, InMemoryClientConnectionRegistry>();
 builder.Services.AddHttpClient<IDiscordWebhookSender, DiscordWebhookSender>();

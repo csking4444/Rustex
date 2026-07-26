@@ -1,0 +1,212 @@
+syntax = "proto2";
+
+package rustplus;
+
+option csharp_namespace = "Rustex.Infrastructure.RustPlus.Proto";
+
+// Best-effort reconstruction of Facepunch's Rust+ companion protocol, based on community
+// reverse-engineering (the schema has been publicly documented and stable for years via
+// projects like liamcottle/rustplus.js). Not an official spec — field numbers/names should be
+// treated as "most likely correct, verify against a live server" rather than guaranteed, since
+// this could not be tested against a real Rust+ connection while writing it. See
+// docs/ARCHITECTURE.md for the honesty note on this whole subsystem.
+
+message AppEmpty {
+}
+
+message AppRequest {
+  optional uint32 seq = 1;
+  optional uint64 playerId = 2;
+  optional uint32 playerToken = 3;
+  optional uint32 entityId = 4;
+
+  optional AppEmpty getInfo = 8;
+  optional AppEmpty getTime = 9;
+  optional AppEmpty getMap = 10;
+  optional AppEmpty getTeamInfo = 11;
+  optional AppEmpty getTeamChat = 12;
+  optional AppSendMessage sendTeamMessage = 13;
+  optional AppEmpty getEntityInfo = 14;
+  optional AppSetEntityValue setEntityValue = 15;
+  optional AppPromoteToLeader promoteToLeader = 16;
+  optional AppEmpty getMapMarkers = 17;
+  optional AppFlag setSubscription = 19;
+}
+
+message AppSendMessage {
+  optional string message = 1;
+}
+
+message AppSetEntityValue {
+  optional bool value = 1;
+}
+
+message AppPromoteToLeader {
+  optional uint64 steamId = 1;
+}
+
+message AppFlag {
+  optional bool value = 1;
+}
+
+message AppMessage {
+  optional AppResponse response = 1;
+  optional AppBroadcast broadcast = 2;
+}
+
+message AppResponse {
+  optional uint32 seq = 1;
+  optional AppSuccess success = 2;
+  optional AppError error = 3;
+  optional AppInfo info = 4;
+  optional AppTime time = 5;
+  optional AppMap map = 6;
+  optional AppTeamInfo teamInfo = 7;
+  optional AppTeamChat teamChat = 8;
+  optional AppEntityInfo entityInfo = 9;
+  optional AppFlag flag = 10;
+  optional AppMapMarkers mapMarkers = 11;
+}
+
+message AppSuccess {
+}
+
+message AppError {
+  optional string error = 1;
+}
+
+message AppInfo {
+  optional string name = 1;
+  optional string headerImage = 2;
+  optional string url = 3;
+  optional string map = 4;
+  optional int32 mapSize = 5;
+  optional int32 wipeTime = 6;
+  optional int32 players = 7;
+  optional int32 maxPlayers = 8;
+  optional int32 queuedPlayers = 9;
+  optional int32 seed = 10;
+  optional int32 salt = 11;
+}
+
+message AppTime {
+  optional float dayLengthMinutes = 1;
+  optional float timeScale = 2;
+  optional float sunrise = 3;
+  optional float sunset = 4;
+  optional float time = 5;
+}
+
+message AppMap {
+  optional int32 width = 1;
+  optional int32 height = 2;
+  optional bytes jpgImage = 3;
+  optional int32 oceanMargin = 4;
+  repeated AppMapMonument monuments = 5;
+  optional bytes background = 6;
+}
+
+message AppMapMonument {
+  optional string token = 1;
+  optional float x = 2;
+  optional float y = 3;
+}
+
+message AppTeamInfo {
+  optional uint64 leaderSteamId = 1;
+  repeated AppTeamInfoMember members = 2;
+  repeated AppTeamInfoNote mapNotes = 3;
+  repeated AppTeamInfoNote leaderMapNotes = 4;
+}
+
+message AppTeamInfoMember {
+  optional uint64 steamId = 1;
+  optional string name = 2;
+  optional float x = 3;
+  optional float y = 4;
+  optional bool isOnline = 5;
+  optional int32 spawnTime = 6;
+  optional bool isAlive = 7;
+  optional int32 deathTime = 8;
+}
+
+message AppTeamInfoNote {
+  optional int32 type = 1;
+  optional float x = 2;
+  optional float y = 3;
+  optional string icon = 4;
+  optional string colourIndex = 5;
+  optional string label = 6;
+}
+
+message AppTeamChat {
+  repeated AppTeamMessage messages = 1;
+}
+
+message AppTeamMessage {
+  optional uint64 steamId = 1;
+  optional string name = 2;
+  optional string message = 3;
+  optional int32 color = 4;
+  optional int32 time = 5;
+}
+
+message AppEntityInfo {
+  optional int32 type = 1;
+  optional AppEntityPayload payload = 2;
+}
+
+message AppEntityPayload {
+  optional bool value = 1;
+  repeated AppEntityPayloadItem items = 2;
+  optional int32 capacity = 3;
+  optional bool hasProtection = 4;
+  optional int32 protectionExpiry = 5;
+}
+
+message AppEntityPayloadItem {
+  optional int32 itemId = 1;
+  optional int32 quantity = 2;
+  optional bool itemIsBlueprint = 3;
+}
+
+message AppMapMarkers {
+  repeated AppMarker markers = 1;
+}
+
+message AppMarker {
+  optional int32 id = 1;
+  optional int32 type = 2; // 1=Player 2=Explosion 3=VendingMachine 4=CH47 5=CargoShip 6=Crate 7=GenericRadius 8=PatrolHelicopter 9=TravellingVendor
+  optional float x = 3;
+  optional float y = 4;
+  optional float steamId = 5;
+  optional float rotation = 6;
+  optional float radius = 7;
+  optional bool alarmActive = 10;
+  repeated AppMarkerSellOrder sellOrders = 12;
+}
+
+message AppMarkerSellOrder {
+  optional int32 itemId = 1;
+  optional int32 quantity = 2;
+  optional int32 currencyId = 3;
+  optional int32 costPerItem = 4;
+  optional int32 amountInStock = 5;
+  optional bool itemIsBlueprint = 6;
+  optional bool currencyIsBlueprint = 7;
+}
+
+message AppBroadcast {
+  optional AppTeamChanged teamChanged = 1;
+  optional AppTeamMessage teamMessage = 2;
+  optional AppEntityChanged entityChanged = 3;
+}
+
+message AppTeamChanged {
+  optional AppTeamInfo teamInfo = 2;
+}
+
+message AppEntityChanged {
+  optional int32 entityId = 1;
+  optional AppEntityPayload payload = 2;
+}

@@ -1,0 +1,38 @@
+syntax = "proto2";
+package checkin_proto;
+option csharp_namespace = "Rustex.Infrastructure.RustPlus.Fcm.Proto";
+
+// Minimal subset of Google's Android device check-in protocol — only the fields needed to get
+// back an androidId + securityToken for an anonymous/unregistered device, and to register a
+// single GCM/FCM subscription. See docs/RUSTPLUS.md: this is the least-verified part of the
+// whole Rust+ pairing stack — field numbers below follow the shape used by community reference
+// implementations (e.g. push-receiver) but have not been checked against a live call.
+
+message AndroidCheckinProto {
+  optional int64 last_checkin_msec = 2;
+  optional string version = 12;
+}
+
+message AndroidCheckinRequest {
+  optional string imei = 1;
+  optional string id = 2; // androidId, 0 on first (registration) checkin
+  optional string digest = 3;
+  optional int64 checkin_timestamp_ms = 5; // unused placeholder to keep numbering obvious
+  optional AndroidCheckinProto checkin = 4;
+  optional string locale = 6;
+  optional string logging_id = 7;
+  optional string market_checkin = 8;
+  optional string mac_addr_type = 9;
+  optional string fragment = 10;
+  optional string user_serial_number = 11;
+  optional string security_token = 13;
+  optional int32 version = 14;
+}
+
+message AndroidCheckinResponse {
+  optional bool stats_ok = 1;
+  optional int64 time_msec = 3;
+  optional uint64 android_id = 7;
+  optional uint64 security_token = 8;
+  optional string version_info = 9;
+}
