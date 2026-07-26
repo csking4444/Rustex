@@ -1,12 +1,22 @@
 namespace Rustex.Domain.Entities;
 
+/// <summary>An account may be linked to any combination of Discord, Steam, and/or
+/// email+password — that's why DiscordId/SteamId/PasswordHash are all nullable. Username is
+/// always populated regardless of provider (Discord username, Steam persona name, or a
+/// user-chosen handle at email signup) so callers never have to branch on provider to get a
+/// display name.</summary>
 public class User
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public string DiscordId { get; set; } = default!;
-    public string DiscordUsername { get; set; } = default!;
-    public string? DiscordAvatar { get; set; }
+    public string Username { get; set; } = default!;
+    public string? AvatarUrl { get; set; }
     public string? Email { get; set; }
+
+    public string? DiscordId { get; set; }
+    public string? SteamId { get; set; }
+    public string? GoogleId { get; set; }
+    public string? PasswordHash { get; set; }
+
     public bool IsActive { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

@@ -9,9 +9,9 @@ import {
   BarChart3,
   Settings,
   ChevronsLeft,
-  ShieldAlert,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { RustexMark } from "@/components/brand/RustexMark";
 
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -37,9 +37,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       className="relative flex h-screen shrink-0 flex-col border-r border-white/5 bg-base-900"
     >
       <div className="flex h-16 items-center gap-2 px-4">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blood/15 border border-blood/30">
-          <ShieldAlert className="h-5 w-5 text-blood-light" />
-        </div>
+        <RustexMark size={30} className="shrink-0" />
         {!collapsed && <span className="truncate text-sm font-semibold tracking-wide text-text-primary">RUSTEX</span>}
       </div>
 

@@ -20,3 +20,13 @@ public class DiscordOAuthOptions
     public string RedirectUri { get; set; } = default!;
     public string FrontendCallbackUrl { get; set; } = default!;
 }
+
+public class GoogleOAuthOptions
+{
+    public const string SectionName = "Google";
+
+    public string ClientId { get; set; } = default!;
+    public string ClientSecret { get; set; } = default!;
+    public string RedirectUri { get; set; } = default!;
+    public string FrontendCallbackUrl { get; set; } = default!;
+}

@@ -23,13 +23,14 @@ public class JwtTokenService : IJwtTokenService
 
     public string CreateAccessToken(User user)
     {
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim("discord_id", user.DiscordId),
-            new Claim("discord_username", user.DiscordUsername),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new("username", user.Username),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
+        if (user.DiscordId is not null) claims.Add(new Claim("discord_id", user.DiscordId));
+        if (user.SteamId is not null) claims.Add(new Claim("steam_id", user.SteamId));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
+import LandingPage from "@/pages/LandingPage";
 import LoginPage from "@/pages/LoginPage";
 import AuthCallbackPage from "@/pages/AuthCallbackPage";
 import DashboardPage from "@/pages/DashboardPage";
@@ -16,6 +17,7 @@ import AcceptInvitePage from "@/pages/AcceptInvitePage";
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
@@ -34,8 +36,7 @@ export default function App() {
         </Route>
       </Route>
 
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

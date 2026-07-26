@@ -86,9 +86,9 @@ export function TeamMembersPanel({ teamId }: { teamId: string }) {
             <li key={member.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-base-800/40 px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-base-700 text-xs font-semibold text-text-secondary">
-                  {member.discordUsername.slice(0, 2).toUpperCase()}
+                  {member.username.slice(0, 2).toUpperCase()}
                 </div>
-                <p className="text-sm font-medium text-text-primary">{member.discordUsername}</p>
+                <p className="text-sm font-medium text-text-primary">{member.username}</p>
               </div>
 
               <div className="flex items-center gap-3">

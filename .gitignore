@@ -13,6 +13,12 @@ client/dist/
 client/.vite/
 client/.env
 client/.env.local
+client/vite.config.js
+client/vite.config.d.ts
+client/*.tsbuildinfo
+
+# --- Root docker-compose secrets ---
+/.env
 
 # --- Logs ---
 *.log

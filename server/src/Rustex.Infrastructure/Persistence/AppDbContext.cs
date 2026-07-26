@@ -47,7 +47,13 @@ public class AppDbContext : DbContext
         // ---------- Identity ----------
         b.Entity<User>(e =>
         {
+            // Postgres unique indexes treat NULL as distinct from every other value, so these
+            // stay correct with DiscordId/SteamId/Email all nullable — any number of users can
+            // have no Discord/Steam link, but two users can't share the same linked one.
             e.HasIndex(x => x.DiscordId).IsUnique();
+            e.HasIndex(x => x.SteamId).IsUnique();
+            e.HasIndex(x => x.GoogleId).IsUnique();
+            e.HasIndex(x => x.Email).IsUnique();
             e.HasOne(x => x.Profile).WithOne(p => p.User).HasForeignKey<UserProfile>(p => p.UserId);
             e.HasOne(x => x.Settings).WithOne(s => s.User).HasForeignKey<UserSettings>(s => s.UserId);
         });

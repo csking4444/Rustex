@@ -34,6 +34,8 @@ builder.Host.UseSerilog((ctx, cfg) => cfg
 // ---------- Options ----------
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<DiscordOAuthOptions>(builder.Configuration.GetSection(DiscordOAuthOptions.SectionName));
+builder.Services.Configure<GoogleOAuthOptions>(builder.Configuration.GetSection(GoogleOAuthOptions.SectionName));
+builder.Services.Configure<SteamAuthOptions>(builder.Configuration.GetSection(SteamAuthOptions.SectionName));
 
 // ---------- Persistence ----------
 builder.Services.AddDbContext<AppDbContext>(opts =>
@@ -50,7 +52,10 @@ if (!string.IsNullOrWhiteSpace(encryptionKey))
 
 // ---------- Auth ----------
 builder.Services.AddHttpClient<IDiscordOAuthService, DiscordOAuthService>();
+builder.Services.AddHttpClient<IGoogleOAuthService, GoogleOAuthService>();
+builder.Services.AddHttpClient<ISteamAuthService, SteamAuthService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddSingleton<IPasswordAuthService, PasswordAuthService>();
 
 var jwtSigningKey = builder.Configuration["Jwt:SigningKey"];
 if (string.IsNullOrWhiteSpace(jwtSigningKey))

@@ -24,7 +24,10 @@ export async function subscribeToPush(): Promise<boolean> {
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(data.publicKey),
+      // TS's TypedArray types became generic over the buffer type in newer @types/dom, which
+      // makes Uint8Array's inferred type not structurally match BufferSource here even though
+      // it is one at runtime — a plain cast is the standard workaround.
+      applicationServerKey: urlBase64ToUint8Array(data.publicKey) as BufferSource,
     });
   }
 

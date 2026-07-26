@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
@@ -7,6 +7,7 @@ import { NotificationDrawer } from "./NotificationDrawer";
 import { RingAlertOverlay } from "@/components/emergency/RingAlertOverlay";
 import { useDashboardRealtime } from "@/hooks/useDashboardRealtime";
 import { useEmergencyAlerts } from "@/hooks/useEmergencyAlerts";
+import { stopDashboardConnection } from "@/lib/signalr";
 import {
   useMarkAllNotificationsRead,
   useMarkNotificationRead,
@@ -21,6 +22,12 @@ export function AppLayout() {
 
   useDashboardRealtime();
   const { incomingCall, dismissIncomingCall } = useEmergencyAlerts();
+
+  // Sole owner of the shared SignalR connection's teardown — useDashboardRealtime and
+  // useEmergencyAlerts both attach listeners to it but don't stop it themselves, so two
+  // independent effects can't race to stop a connection the other is still using. This only
+  // fires when the authenticated app shell itself unmounts (e.g. logout), not on every re-render.
+  useEffect(() => () => void stopDashboardConnection(), []);
 
   const { data: notifications } = useNotifications();
   const { data: unreadCount } = useUnreadNotificationCount();

@@ -32,7 +32,7 @@ public class TeamMembersController : ControllerBase
             .ToListAsync(ct);
 
         return members.Select(m => new TeamMemberResponse(
-            m.Id, m.UserId, m.User.DiscordUsername, m.User.DiscordAvatar, m.Role.Name, m.Status, m.JoinedAt)).ToList();
+            m.Id, m.UserId, m.User.Username, m.User.AvatarUrl, m.Role.Name, m.Status, m.JoinedAt)).ToList();
     }
 
     [HttpPut("{userId:guid}/role")]
@@ -52,7 +52,7 @@ public class TeamMembersController : ControllerBase
         member.RoleId = newRole.Id;
         await _db.SaveChangesAsync(ct);
 
-        return new TeamMemberResponse(member.Id, member.UserId, member.User.DiscordUsername, member.User.DiscordAvatar, newRole.Name, member.Status, member.JoinedAt);
+        return new TeamMemberResponse(member.Id, member.UserId, member.User.Username, member.User.AvatarUrl, newRole.Name, member.Status, member.JoinedAt);
     }
 
     [HttpDelete("{userId:guid}")]

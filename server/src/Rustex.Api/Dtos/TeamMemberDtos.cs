@@ -5,8 +5,8 @@ namespace Rustex.Api.Dtos;
 public record TeamMemberResponse(
     Guid Id,
     Guid UserId,
-    string DiscordUsername,
-    string? DiscordAvatar,
+    string Username,
+    string? AvatarUrl,
     string RoleName,
     TeamMemberStatus Status,
     DateTimeOffset JoinedAt);

@@ -20,7 +20,7 @@ public class JwtTokenServiceTests
     public void CreateAccessToken_ProducesNonEmptyJwt()
     {
         var service = CreateService();
-        var user = new User { DiscordId = "123", DiscordUsername = "tester" };
+        var user = new User { DiscordId = "123", Username = "tester" };
 
         var token = service.CreateAccessToken(user);
 

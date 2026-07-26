@@ -6,8 +6,15 @@ public record TokenResponse(string AccessToken, string RefreshToken, DateTimeOff
 
 public record CurrentUserResponse(
     Guid Id,
-    string DiscordUsername,
-    string? DiscordAvatar,
+    string Username,
+    string? AvatarUrl,
     string? Email,
     string? DisplayName,
-    string Timezone);
+    string Timezone,
+    bool HasPassword,
+    bool HasDiscord,
+    bool HasSteam);
+
+public record RegisterRequest(string Email, string Password, string Username);
+
+public record LoginRequest(string Email, string Password);

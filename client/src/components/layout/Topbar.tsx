@@ -27,26 +27,22 @@ export function Topbar({ onOpenNotifications, notificationCount }: TopbarProps) 
         >
           <Bell className="h-4 w-4" />
           {notificationCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4.5 min-w-[1.125rem] items-center justify-center rounded-full bg-critical px-1 text-[10px] font-semibold text-white animate-pulse-glow">
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-[1.125rem] items-center justify-center rounded-full bg-critical px-1 text-[10px] font-semibold text-white animate-pulse-glow">
               {notificationCount}
             </span>
           )}
         </button>
 
         <div className="flex items-center gap-3 border-l border-white/5 pl-4">
-          {user?.discordAvatar ? (
-            <img
-              src={`https://cdn.discordapp.com/avatars/${user.id}/${user.discordAvatar}.png`}
-              alt={user.discordUsername}
-              className="h-8 w-8 rounded-full border border-white/10"
-            />
+          {user?.avatarUrl ? (
+            <img src={user.avatarUrl} alt={user.username} className="h-8 w-8 rounded-full border border-white/10" />
           ) : (
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-base-700 text-xs font-semibold text-text-secondary">
-              {user?.discordUsername?.slice(0, 2).toUpperCase()}
+              {user?.username?.slice(0, 2).toUpperCase()}
             </div>
           )}
           <span className="hidden text-sm font-medium text-text-secondary sm:block">
-            {user?.displayName ?? user?.discordUsername}
+            {user?.displayName ?? user?.username}
           </span>
           <button onClick={() => void logout()} className="text-text-muted transition-colors hover:text-critical">
             <LogOut className="h-4 w-4" />

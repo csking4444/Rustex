@@ -39,11 +39,14 @@ export interface Webhook {
 
 export interface CurrentUser {
   id: string;
-  discordUsername: string;
-  discordAvatar: string | null;
+  username: string;
+  avatarUrl: string | null;
   email: string | null;
   displayName: string | null;
   timezone: string;
+  hasPassword: boolean;
+  hasDiscord: boolean;
+  hasSteam: boolean;
 }
 
 export interface RustServerSummary {
@@ -134,8 +137,8 @@ export interface ChatTemplateMetadata {
 export interface TeamMemberSummary {
   id: string;
   userId: string;
-  discordUsername: string;
-  discordAvatar: string | null;
+  username: string;
+  avatarUrl: string | null;
   roleName: string;
   status: string;
   joinedAt: string;

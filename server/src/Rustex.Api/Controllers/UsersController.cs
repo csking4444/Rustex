@@ -28,10 +28,13 @@ public class UsersController : ControllerBase
 
         return new CurrentUserResponse(
             user.Id,
-            user.DiscordUsername,
-            user.DiscordAvatar,
+            user.Username,
+            user.AvatarUrl,
             user.Email,
             user.Profile?.DisplayName,
-            user.Profile?.Timezone ?? "UTC");
+            user.Profile?.Timezone ?? "UTC",
+            user.PasswordHash is not null,
+            user.DiscordId is not null,
+            user.SteamId is not null);
     }
 }

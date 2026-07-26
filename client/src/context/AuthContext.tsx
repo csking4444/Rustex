@@ -3,11 +3,19 @@ import { apiClient } from "@/lib/apiClient";
 import { tokenStorage } from "@/lib/tokenStorage";
 import type { CurrentUser } from "@/types";
 
+interface TokenPair {
+  accessToken: string;
+  refreshToken: string;
+}
+
 interface AuthContextValue {
   user: CurrentUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  loginWithDiscord: () => void;
+  loginWithGoogle: () => void;
+  loginWithSteam: () => void;
+  registerWithPassword: (email: string, password: string, username: string) => Promise<void>;
+  loginWithPassword: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refetchUser: () => Promise<void>;
 }
@@ -39,9 +47,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void fetchUser();
   }, [fetchUser]);
 
-  const loginWithDiscord = useCallback(() => {
-    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/auth/discord/login`;
+  const loginWithGoogle = useCallback(() => {
+    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/auth/google/login`;
   }, []);
+
+  const loginWithSteam = useCallback(() => {
+    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/auth/steam/login`;
+  }, []);
+
+  const registerWithPassword = useCallback(
+    async (email: string, password: string, username: string) => {
+      const { data } = await apiClient.post<TokenPair>("/auth/register", { email, password, username });
+      tokenStorage.setTokens(data.accessToken, data.refreshToken);
+      await fetchUser();
+    },
+    [fetchUser],
+  );
+
+  const loginWithPassword = useCallback(
+    async (email: string, password: string) => {
+      const { data } = await apiClient.post<TokenPair>("/auth/login", { email, password });
+      tokenStorage.setTokens(data.accessToken, data.refreshToken);
+      await fetchUser();
+    },
+    [fetchUser],
+  );
 
   const logout = useCallback(async () => {
     const refreshToken = tokenStorage.getRefreshToken();
@@ -61,11 +91,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isLoading,
       isAuthenticated: user !== null,
-      loginWithDiscord,
+      loginWithGoogle,
+      loginWithSteam,
+      registerWithPassword,
+      loginWithPassword,
       logout,
       refetchUser: fetchUser,
     }),
-    [user, isLoading, loginWithDiscord, logout, fetchUser],
+    [user, isLoading, loginWithGoogle, loginWithSteam, registerWithPassword, loginWithPassword, logout, fetchUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

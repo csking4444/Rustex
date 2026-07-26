@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getDashboardConnection, stopDashboardConnection } from "@/lib/signalr";
+import { getDashboardConnection } from "@/lib/signalr";
 import { useServers } from "./useServers";
 
 /**
@@ -55,7 +55,9 @@ export function useDashboardRealtime() {
     return () => {
       connection.off("ServerStatusUpdated", onServerStatusUpdated);
       connection.off("RaidEventCreated", onRaidEventCreated);
-      void stopDashboardConnection();
+      // Deliberately not stopping the connection here — it's a shared singleton also used by
+      // useEmergencyAlerts, and AppLayout owns its start/stop lifecycle (see there) so the two
+      // consumers don't race to stop a connection the other is still using.
     };
   }, [queryClient]);
 }
