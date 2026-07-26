@@ -4,24 +4,28 @@
 
 This project is an independent implementation, inspired only by the *category* of tool it belongs to (Rust server companion / raid-alarm utilities). No proprietary code, assets, or branding from any existing application were copied. All code, UI, architecture, and branding here are original.
 
-> ⚠️ **Build status: Phase 1 + 2 done, Phase 3 + part of Phase 4 in progress.** See [docs/ROADMAP.md](docs/ROADMAP.md) for the full phase-by-phase status.
+> ⚠️ **Build status: Phases 1, 2, 6, 8 done; Phases 3, 4, 5, 7 mostly done; Phase 9/10 baseline only.** See [docs/ROADMAP.md](docs/ROADMAP.md) for the full phase-by-phase status and exactly what's real vs. stubbed in each.
 
 ---
 
 ## What's implemented
 
-- [x] Repo structure, Docker Compose, CI skeleton
+- [x] Repo structure, Docker Compose (+ prod TLS overlay), CI skeleton
 - [x] PostgreSQL schema for the full domain model (users, teams, servers, raid events, notifications, phone alerts, analytics, etc.)
 - [x] ASP.NET Core 8 Web API: Discord OAuth2 login, JWT access tokens + rotating refresh tokens, role-based authorization, Redis-backed caching/session store, Serilog logging, rate limiting, security headers, health checks
 - [x] SignalR hub for real-time push (`/hubs/dashboard`), consumed live by the frontend
-- [x] **Real live server status** (Phase 2): `A2sQueryClient` speaks the Source engine A2S_INFO protocol to each server's query port — genuine ping/player-count/map data from any public Rust server, no plugin or Rust+ pairing required. `ServerStatusPollingWorker` polls every 20s and pushes updates over SignalR.
-- [x] **Tier-based raid alarm evaluation** (Phase 3): `RaidAlarmEvaluator` clusters events by time window + radius and classifies each cluster into `Tier1`/`Tier2`/`Tier3` by explosion/notification count (defaults: 1+/3+/5+), all per-server and adjustable via the Raid Alerts page or `/api/servers/{id}/raid-alarm-settings`.
-- [x] **Platform-aware emergency alerts** (Phase 4, partial): a qualifying raid triggers a full-screen ring alert (installed/standalone PWA) or a plain browser notification (regular desktop tab) — see the ingestion note below for what's real vs. stubbed here.
-- [x] React 18 + TypeScript + Tailwind + Framer Motion + React Query + React Router frontend: tactical theme, Discord login flow, collapsible sidebar shell, notification drawer, dashboard with live server/raid cards, ring-alert overlay
+- [x] **Real live server status** (Phase 2): `A2sQueryClient` speaks the Source engine A2S_INFO protocol to each server's query port — genuine ping/player-count/map data from any public Rust server, no plugin or Rust+ pairing required.
+- [x] **Tier-based raid alarm evaluation** (Phase 3): `RaidAlarmEvaluator` clusters events by time window + radius and classifies each cluster into `Tier1`/`Tier2`/`Tier3` by explosion/notification count (defaults: 1+/3+/5+), all per-server and adjustable via the Raid Alerts page.
+- [x] **Platform-aware emergency alerts** (Phase 4, partial): a qualifying raid triggers a full-screen ring alert (installed/standalone PWA) or a plain browser notification (regular desktop tab).
+- [x] **Team chat automation templates** (Phase 5, partial): full template CRUD + live preview with all 8 spec placeholders; nothing sends them into the game yet (same bridge gap as raid detection).
+- [x] **Interactive map** (Phase 6): custom pan/zoom marker map — not real Rust map tiles (none exist publicly), an honest coordinate grid instead.
+- [x] **Team invites & roles** (Phase 7, partial): token invites, Owner/Admin/Member roles, member management.
+- [x] **Analytics** (Phase 8): raids per day/hour, tier breakdown, ping/player trends — computed live, not from a precomputed rollup.
+- [x] React 18 + TypeScript + Tailwind + Framer Motion + React Query + React Router frontend covering all of the above.
 
 ## What's *not* built yet
 
-Rust team chat automation, interactive map, real PSTN phone call escalation (Twilio/etc.), analytics engine, full team management, and the actual Rust+ Smart Alarm listener (currently an honest stub) are designed for in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and scheduled in [docs/ROADMAP.md](docs/ROADMAP.md), but not implemented.
+Actually sending a chat template into in-game team chat, real PSTN phone call escalation (Twilio/etc.), the live Rust+ Smart Alarm listener (currently an honest stub), a real permission matrix (roles exist, granular permissions don't), and background analytics rollups are designed for in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and scheduled in [docs/ROADMAP.md](docs/ROADMAP.md), but not implemented.
 
 ---
 

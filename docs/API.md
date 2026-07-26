@@ -2,7 +2,7 @@
 
 Base URL (dev): `https://localhost:5443/api`
 
-Only implemented endpoints are listed. Everything else in the original spec's API surface (notifications, maps, analytics, PSTN call alerts) is scoped for later phases and will be documented here as it lands.
+Only implemented endpoints are listed. Everything else in the original spec's API surface (Discord webhook notifications, PSTN call alerts, quiet hours) is scoped for later phases and will be documented here as it lands.
 
 ## Auth
 
@@ -26,12 +26,54 @@ Only implemented endpoints are listed. Everything else in the original spec's AP
 
 Live status comes from `ServerStatusPollingWorker`, which queries each server's query port via A2S_INFO (the Source engine query protocol used by the Steam server browser) every 20 seconds — this is real data from any publicly reachable Rust server, not a stub. `queryPort` must be set on the server for polling to run; `queueSize` is always null today since A2S_INFO doesn't expose it.
 
-## Teams (stub CRUD)
+## Teams
 
 | Method | Path | Description |
 |---|---|---|
 | GET | `/teams` | Teams the current user belongs to |
-| POST | `/teams` | Create a team (creator becomes Owner) |
+| POST | `/teams` | Create a team (creator becomes Owner; also seeds Admin/Member roles) |
+
+## Team Members & Invites
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/teams/{teamId}/members` | Active members with role/status (any member) |
+| PUT | `/teams/{teamId}/members/{userId}/role` | Change a member's role to Admin/Member (Owner only) |
+| DELETE | `/teams/{teamId}/members/{userId}` | Remove a member (Owner), or leave the team (self) |
+| GET | `/teams/{teamId}/invites` | Pending invites (any member) |
+| POST | `/teams/{teamId}/invites` | Create an invite — body `{ inviteeDiscord? }`, returns a token, 7-day expiry |
+| DELETE | `/teams/{teamId}/invites/{id}` | Revoke a pending invite |
+| POST | `/team-invites/{token}/accept` | Accept an invite as the current user — top-level route since the accepter isn't a team member yet |
+
+## Team Chat Templates
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/teams/{teamId}/message-templates` | List templates for a team |
+| POST | `/teams/{teamId}/message-templates` | Create — body `{ serverId?, eventType, templateText, isEnabled, cooldownSeconds }` (one per team+server+event) |
+| PUT | `/teams/{teamId}/message-templates/{id}` | Update text/enabled/cooldown |
+| DELETE | `/teams/{teamId}/message-templates/{id}` | Delete |
+| GET | `/chat-templates/metadata` | Supported event types + placeholders (`{server} {grid} {time} {event} {player} {count} {team} {weapon}`) |
+| POST | `/chat-templates/preview` | Body `{ templateText, eventType? }` → `{ rendered }`, using sample data |
+
+No delivery yet — see the note in `docs/ARCHITECTURE.md#team-chat-automation-phase-5`.
+
+## Map & Markers
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/servers/{serverId}/map` | Map metadata for a server (auto-created on first access) |
+| PUT | `/servers/{serverId}/map` | Update `imageUrl`/`width`/`height` |
+| GET | `/servers/{serverId}/map/markers` | List markers |
+| POST | `/servers/{serverId}/map/markers` | Create — body `{ type, x, y, label?, color?, isShared }` |
+| PUT | `/servers/{serverId}/map/markers/{id}` | Update label/color/isShared |
+| DELETE | `/servers/{serverId}/map/markers/{id}` | Delete |
+
+## Analytics
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/servers/{serverId}/analytics/summary?days=7` | Total raids, tier breakdown, raids-by-day, raids-by-hour (UTC), avg ping, avg/peak players — computed live, `days` clamped to 1-90 |
 
 ## Raid Events (simulated event source — see note below)
 

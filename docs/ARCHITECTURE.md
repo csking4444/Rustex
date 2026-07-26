@@ -93,6 +93,22 @@ Two more pieces feed into and act on the same tiering pipeline:
 
 For everything else (Discord webhooks, generic push, quiet hours), the `Notifications` / `NotificationHistory` tables are in place but the fan-out service around them is still schema-only — see [ROADMAP.md](ROADMAP.md).
 
+## Team chat automation (Phase 5)
+
+`TemplateRenderer` (`Rustex.Domain.Templating`) is, like the raid evaluator, pure logic — placeholder substitution over a fixed set (`{server} {grid} {time} {event} {player} {count} {team} {weapon}`) with no framework dependency. `MessageTemplate` rows (one per team+event, optionally scoped to a single server) are managed via `MessageTemplatesController`; `ChatTemplateMetadataController` exposes the supported event-type catalog (`ChatEventTypes`) and a preview endpoint that renders a template against sample data. What's *not* built: anything that actually sends a rendered template into in-game team chat — that needs the same bridge (Rust+ pairing or a plugin) the raid-detection gap depends on, so the automation UI is fully real but currently automates nothing downstream.
+
+## Interactive map (Phase 6)
+
+`MapData` is created lazily, one row per server, the first time its map or markers are requested (`MapController.GetOrCreateMapAsync` — same lazy-default pattern as `RaidAlarmSettings`). Markers (`Marker`: type/x/y/label/color/isShared) are plain CRUD scoped to that map. The frontend's `InteractiveMap` is a custom SVG viewer using the SVG element's native `viewBox` for zoom/pan state and `getScreenCTM().inverse()` for exact screen-to-world coordinate conversion on click/drag — deliberately not MapLibre or any tile-based library, because there is no real tile source: Rust's terrain is procedurally generated per-seed and Facepunch exposes no map-imagery API. `MapData.ImageUrl` is reserved for a server-supplied image (e.g. from a community map-render service) to be layered in behind the grid later.
+
+## Team features (Phase 7)
+
+Team creation seeds three system `TeamRole` rows (Owner/Admin/Member); the creator becomes Owner. `TeamInvitesController` issues random-token invites (7-day expiry) accepted via a token-only endpoint (`TeamInviteAcceptanceController`, not nested under a team route since the accepting user isn't a member yet) that adds the accepter with the Member role. `TeamMembersController` lets the Owner change roles or remove members, and lets any member remove themselves. The `Permission`/`team_role_permissions` tables from the Phase 1 schema exist but are unseeded and unenforced — today's authorization is "Owner can do X" checks in each controller, not a real permission matrix.
+
+## Analytics (Phase 8)
+
+`AnalyticsController` computes everything on demand from `RaidEvents`/`ServerStatusSnapshots` rather than reading from a precomputed `AnalyticsSnapshot` table. This is a deliberate simplification, not an oversight: `Count`/`Average`/`Max` are simple aggregates that reliably translate to SQL across EF Core/Npgsql versions (unlike the "first row per group" pattern called out in `ServersController`'s snapshot-join comment), and computing live means the numbers are never stale. Day/hour bucketing happens in-memory after a single bounded fetch (`WHERE ServerId = ... AND DetectedAt >= cutoff`), which is fine at the data volumes this app has today. `AnalyticsSnapshot`-based rollups remain the right move once raid volume makes scanning raw rows per request expensive — see [ROADMAP.md](ROADMAP.md) Phase 9.
+
 ## Security
 
 - Discord OAuth2 for identity; the app never sees or stores Discord passwords.
