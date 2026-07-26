@@ -1,27 +1,24 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { BellOff, X } from "lucide-react";
-
-export interface DrawerNotification {
-  id: string;
-  title: string;
-  body?: string;
-  severity: "info" | "warning" | "critical";
-  createdAt: string;
-}
+import { BellOff, CheckCheck, X } from "lucide-react";
+import type { NotificationSummary } from "@/types";
 
 interface NotificationDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  notifications: DrawerNotification[];
+  notifications: NotificationSummary[];
+  onMarkRead: (id: string) => void;
+  onMarkAllRead: () => void;
 }
 
-const SEVERITY_BADGE: Record<DrawerNotification["severity"], string> = {
-  info: "badge-info",
-  warning: "badge-warning",
-  critical: "badge-critical",
+const SEVERITY_BADGE: Record<NotificationSummary["severity"], string> = {
+  Info: "badge-info",
+  Warning: "badge-warning",
+  Critical: "badge-critical",
 };
 
-export function NotificationDrawer({ isOpen, onClose, notifications }: NotificationDrawerProps) {
+export function NotificationDrawer({ isOpen, onClose, notifications, onMarkRead, onMarkAllRead }: NotificationDrawerProps) {
+  const hasUnread = notifications.some((n) => !n.isRead);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -42,9 +39,17 @@ export function NotificationDrawer({ isOpen, onClose, notifications }: Notificat
           >
             <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-5">
               <h2 className="text-sm font-semibold text-text-primary">Notifications</h2>
-              <button onClick={onClose} className="text-text-muted hover:text-white">
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-3">
+                {hasUnread && (
+                  <button onClick={onMarkAllRead} className="flex items-center gap-1 text-xs text-text-muted hover:text-white">
+                    <CheckCheck className="h-3.5 w-3.5" />
+                    Mark all read
+                  </button>
+                )}
+                <button onClick={onClose} className="text-text-muted hover:text-white">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
@@ -56,7 +61,11 @@ export function NotificationDrawer({ isOpen, onClose, notifications }: Notificat
               ) : (
                 <ul className="flex flex-col gap-2">
                   {notifications.map((n) => (
-                    <li key={n.id} className="glass-panel glass-panel-hover p-3">
+                    <li
+                      key={n.id}
+                      onClick={() => !n.isRead && onMarkRead(n.id)}
+                      className={`glass-panel glass-panel-hover cursor-pointer p-3 ${n.isRead ? "opacity-60" : ""}`}
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-sm font-medium text-text-primary">{n.title}</p>
                         <span className={SEVERITY_BADGE[n.severity]}>{n.severity}</span>

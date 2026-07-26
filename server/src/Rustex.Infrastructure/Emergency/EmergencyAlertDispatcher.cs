@@ -11,6 +11,10 @@ namespace Rustex.Infrastructure.Emergency;
 /// After EventIngestionWorker persists a qualifying RaidEvent, decides who to alert and how.
 /// Phase 1/2/3 scope: only the server owner is considered (team-wide alerting is Phase 7).
 ///
+/// Respects the user's UserSettings: CallEnabled/DesktopEnabled toggles, and a quiet-hours
+/// window (timezone-aware, handles midnight wraparound) that mutes the ring alert specifically
+/// — a muted ring still falls back to a desktop notification rather than going silent entirely.
+///
 /// Delivery channel: a user with a live "App" (installed/standalone) connection gets a
 /// full-screen, looping-audio ring alert; otherwise they get a plain browser notification. This
 /// deliberately does *not* place a real PSTN phone call — a browser/PWA has no way to register
@@ -27,17 +31,23 @@ public class EmergencyAlertDispatcher : IEmergencyAlertDispatcher
     private readonly AppDbContext _db;
     private readonly IClientConnectionRegistry _connectionRegistry;
     private readonly IRaidEventBroadcaster _broadcaster;
+    private readonly IDiscordWebhookSender _discordWebhookSender;
+    private readonly IWebPushSender _webPushSender;
     private readonly ILogger<EmergencyAlertDispatcher> _logger;
 
     public EmergencyAlertDispatcher(
         AppDbContext db,
         IClientConnectionRegistry connectionRegistry,
         IRaidEventBroadcaster broadcaster,
+        IDiscordWebhookSender discordWebhookSender,
+        IWebPushSender webPushSender,
         ILogger<EmergencyAlertDispatcher> logger)
     {
         _db = db;
         _connectionRegistry = connectionRegistry;
         _broadcaster = broadcaster;
+        _discordWebhookSender = discordWebhookSender;
+        _webPushSender = webPushSender;
         _logger = logger;
     }
 
@@ -99,14 +109,90 @@ public class EmergencyAlertDispatcher : IEmergencyAlertDispatcher
             raidEvent.DetectedAt,
         };
 
-        var activeKinds = _connectionRegistry.GetActiveKinds(userId);
-        if (activeKinds.Contains(ClientKind.App))
-            await _broadcaster.BroadcastIncomingRaidCallAsync(userId, payload, ct);
-        else
-            await _broadcaster.BroadcastRaidAlertNotificationAsync(userId, payload, ct);
+        var userSettings = await _db.UserSettings.FirstOrDefaultAsync(s => s.UserId == userId, ct);
+        var inQuietHours = userSettings is not null && IsWithinQuietHours(userSettings);
 
-        // TODO(Phase 5): also fire a Web Push (service worker) delivery for App-kind users who
-        // are currently disconnected/backgrounded — SignalR only reaches live connections.
+        var activeKinds = _connectionRegistry.GetActiveKinds(userId);
+        var wantsRingAlert = activeKinds.Contains(ClientKind.App) && !inQuietHours && (userSettings?.CallEnabled ?? true);
+
+        if (wantsRingAlert)
+        {
+            await _broadcaster.BroadcastIncomingRaidCallAsync(userId, payload, ct);
+        }
+        else if (userSettings?.DesktopEnabled ?? true)
+        {
+            // Also the fallback for App-kind users during quiet hours or with ring alerts
+            // disabled — quiet hours mute the *ring*, not the notification entirely.
+            await _broadcaster.BroadcastRaidAlertNotificationAsync(userId, payload, ct);
+        }
+
+        if (userSettings?.DiscordEnabled ?? false)
+        {
+            var webhooks = await _db.Webhooks
+                .Where(w => w.ServerId == server.Id && w.IsActive && w.EventTypes.Contains(RaidDetectedTrigger))
+                .ToListAsync(ct);
+
+            foreach (var webhook in webhooks)
+                await _discordWebhookSender.SendRaidAlertAsync(webhook.Url, raidEvent, server.Name, ct);
+        }
+
+        if ((userSettings?.PushEnabled ?? false) && _webPushSender.IsConfigured)
+            await SendWebPushAsync(userId, notification, ct);
+    }
+
+    /// <summary>Unlike the SignalR channels above, Web Push reaches a subscribed browser/PWA
+    /// even when it's backgrounded or fully closed (that's the entire point of the Push API) —
+    /// so this fires regardless of ClientConnectionRegistry state. A dead subscription (push
+    /// service returns 404/410) is deleted so it stops being retried on future alerts.</summary>
+    private async Task SendWebPushAsync(Guid userId, Notification notification, CancellationToken ct)
+    {
+        var subscriptions = await _db.PushSubscriptions.Where(s => s.UserId == userId).ToListAsync(ct);
+        if (subscriptions.Count == 0) return;
+
+        var payloadJson = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            title = notification.Title,
+            body = notification.Body,
+            notificationId = notification.Id,
+        });
+
+        foreach (var subscription in subscriptions)
+        {
+            var result = await _webPushSender.SendAsync(subscription, payloadJson, ct);
+            if (result == WebPushResult.SubscriptionExpired)
+                _db.PushSubscriptions.Remove(subscription);
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Compares "now" against QuietHoursStart/End in the user's configured timezone.
+    /// Handles windows that cross midnight (e.g. 22:00-08:00).</summary>
+    private static bool IsWithinQuietHours(UserSettings settings)
+    {
+        if (settings.QuietHoursStart is null || settings.QuietHoursEnd is null) return false;
+
+        TimeZoneInfo timeZone;
+        try
+        {
+            timeZone = TimeZoneInfo.FindSystemTimeZoneById(settings.QuietHoursTimezone);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            timeZone = TimeZoneInfo.Utc;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            timeZone = TimeZoneInfo.Utc;
+        }
+
+        var localNow = TimeOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, timeZone).DateTime);
+        var start = settings.QuietHoursStart.Value;
+        var end = settings.QuietHoursEnd.Value;
+
+        return start <= end
+            ? localNow >= start && localNow < end
+            : localNow >= start || localNow < end;
     }
 
     private async Task<CallAlertSetting?> ResolveSettingsAsync(Guid userId, Guid serverId, CancellationToken ct)

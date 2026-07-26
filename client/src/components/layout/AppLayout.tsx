@@ -7,6 +7,12 @@ import { NotificationDrawer } from "./NotificationDrawer";
 import { RingAlertOverlay } from "@/components/emergency/RingAlertOverlay";
 import { useDashboardRealtime } from "@/hooks/useDashboardRealtime";
 import { useEmergencyAlerts } from "@/hooks/useEmergencyAlerts";
+import {
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+  useNotifications,
+  useUnreadNotificationCount,
+} from "@/hooks/useNotifications";
 
 export function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -16,12 +22,17 @@ export function AppLayout() {
   useDashboardRealtime();
   const { incomingCall, dismissIncomingCall } = useEmergencyAlerts();
 
+  const { data: notifications } = useNotifications();
+  const { data: unreadCount } = useUnreadNotificationCount();
+  const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-base-950">
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar onOpenNotifications={() => setDrawerOpen(true)} notificationCount={0} />
+        <Topbar onOpenNotifications={() => setDrawerOpen(true)} notificationCount={unreadCount ?? 0} />
 
         <main className="flex-1 overflow-y-auto p-6">
           <AnimatePresence mode="wait">
@@ -38,7 +49,13 @@ export function AppLayout() {
         </main>
       </div>
 
-      <NotificationDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} notifications={[]} />
+      <NotificationDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        notifications={notifications ?? []}
+        onMarkRead={(id) => markRead.mutate(id)}
+        onMarkAllRead={() => markAllRead.mutate()}
+      />
       <RingAlertOverlay alert={incomingCall} onDismiss={dismissIncomingCall} />
     </div>
   );

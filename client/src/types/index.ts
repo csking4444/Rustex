@@ -1,6 +1,41 @@
 export type RaidTier = "Tier1" | "Tier2" | "Tier3";
 export type RaidStatus = "Active" | "Quiet" | "Ended";
 export type ServerStatus = "Unknown" | "Online" | "Offline";
+export type NotificationSeverity = "Info" | "Warning" | "Critical";
+
+export interface NotificationSummary {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  severity: NotificationSeverity;
+  isRead: boolean;
+  relatedEntityType: string | null;
+  relatedEntityId: string | null;
+  createdAt: string;
+}
+
+export interface UserSettings {
+  soundEnabled: boolean;
+  desktopEnabled: boolean;
+  browserEnabled: boolean;
+  discordEnabled: boolean;
+  pushEnabled: boolean;
+  callEnabled: boolean;
+  quietHoursStart: string | null;
+  quietHoursEnd: string | null;
+  quietHoursTimezone: string;
+  updatedAt: string;
+}
+
+export interface Webhook {
+  id: string;
+  serverId: string | null;
+  url: string;
+  eventTypes: string[];
+  isActive: boolean;
+  createdAt: string;
+}
 
 export interface CurrentUser {
   id: string;

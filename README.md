@@ -16,12 +16,14 @@ This project is an independent implementation, inspired only by the *category* o
 - [x] SignalR hub for real-time push (`/hubs/dashboard`), consumed live by the frontend
 - [x] **Real live server status** (Phase 2): `A2sQueryClient` speaks the Source engine A2S_INFO protocol to each server's query port — genuine ping/player-count/map data from any public Rust server, no plugin or Rust+ pairing required.
 - [x] **Tier-based raid alarm evaluation** (Phase 3): `RaidAlarmEvaluator` clusters events by time window + radius and classifies each cluster into `Tier1`/`Tier2`/`Tier3` by explosion/notification count (defaults: 1+/3+/5+), all per-server and adjustable via the Raid Alerts page.
-- [x] **Platform-aware emergency alerts** (Phase 4, partial): a qualifying raid triggers a full-screen ring alert (installed/standalone PWA) or a plain browser notification (regular desktop tab).
+- [x] **Platform-aware emergency alerts** (Phase 4): a qualifying raid triggers a full-screen ring alert (installed/standalone PWA) or a plain browser notification (regular desktop tab) — plus real **Discord webhooks**, **Web Push** (reaches a closed PWA, not just an open tab), and timezone-aware **quiet hours**, all opt-in from Settings.
+- [x] **Notification center**: bell badge with live unread count, mark-read/mark-all-read, wired to the same alert pipeline.
 - [x] **Team chat automation templates** (Phase 5, partial): full template CRUD + live preview with all 8 spec placeholders; nothing sends them into the game yet (same bridge gap as raid detection).
 - [x] **Interactive map** (Phase 6): custom pan/zoom marker map — not real Rust map tiles (none exist publicly), an honest coordinate grid instead.
 - [x] **Team invites & roles** (Phase 7, partial): token invites, Owner/Admin/Member roles, member management.
 - [x] **Analytics** (Phase 8): raids per day/hour, tier breakdown, ping/player trends — computed live, not from a precomputed rollup.
 - [x] React 18 + TypeScript + Tailwind + Framer Motion + React Query + React Router frontend covering all of the above.
+- [x] Vercel-ready frontend deploy config (`client/vercel.json`) — see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for hosting the backend too (Vercel can't run ASP.NET Core).
 
 ## What's *not* built yet
 
@@ -153,6 +155,7 @@ cd client && npm run test
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system design, module boundaries, event ingestion design
 - [docs/ROADMAP.md](docs/ROADMAP.md) — phase-by-phase build plan
 - [docs/API.md](docs/API.md) — REST + SignalR endpoint reference for what's implemented so far
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — deploying the frontend to Vercel + backend hosting options
 - [database/schema.sql](database/schema.sql) — reference relational schema
 
 ## License / originality note

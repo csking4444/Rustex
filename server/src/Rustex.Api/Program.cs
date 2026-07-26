@@ -12,6 +12,7 @@ using Rustex.Infrastructure.Auth;
 using Rustex.Infrastructure.Caching;
 using Rustex.Infrastructure.Emergency;
 using Rustex.Infrastructure.EventIngestion;
+using Rustex.Infrastructure.Notifications;
 using Rustex.Infrastructure.Persistence;
 using Rustex.Infrastructure.Realtime;
 using Rustex.Infrastructure.Security;
@@ -117,6 +118,9 @@ builder.Services.AddSingleton<IServerQueryClient, A2sQueryClient>();
 builder.Services.AddHostedService<ServerStatusPollingWorker>();
 
 builder.Services.AddSingleton<IClientConnectionRegistry, InMemoryClientConnectionRegistry>();
+builder.Services.AddHttpClient<IDiscordWebhookSender, DiscordWebhookSender>();
+builder.Services.Configure<WebPushOptions>(builder.Configuration.GetSection(WebPushOptions.SectionName));
+builder.Services.AddSingleton<IWebPushSender, WebPushSender>();
 builder.Services.AddScoped<IEmergencyAlertDispatcher, EmergencyAlertDispatcher>();
 builder.Services.AddSingleton<IRustPlusNotificationListener, RustPlusNotificationListener>();
 

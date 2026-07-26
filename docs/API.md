@@ -2,7 +2,7 @@
 
 Base URL (dev): `https://localhost:5443/api`
 
-Only implemented endpoints are listed. Everything else in the original spec's API surface (Discord webhook notifications, PSTN call alerts, quiet hours) is scoped for later phases and will be documented here as it lands.
+Only implemented endpoints are listed. Everything else in the original spec's API surface (PSTN call alerts, escalation) is scoped for later phases and will be documented here as it lands.
 
 ## Auth
 
@@ -13,6 +13,37 @@ Only implemented endpoints are listed. Everything else in the original spec's AP
 | POST | `/auth/refresh` | Body: `{ refreshToken }` → new access + refresh token pair (rotates the refresh token) |
 | POST | `/auth/logout` | Revokes the current refresh token/session |
 | GET | `/users/me` | Current authenticated user + profile (requires `Authorization: Bearer <token>`) |
+| GET | `/users/me/settings` | Notification channel toggles + quiet hours (auto-created with defaults on first access) |
+| PUT | `/users/me/settings` | Update — `quietHoursStart`/`quietHoursEnd` are `"HH:mm"` strings or null (both or neither) |
+
+## Notifications
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/notifications?limit=20&unreadOnly=false` | Recent notifications for the current user |
+| GET | `/notifications/unread-count` | Unread count (polled every 60s by the frontend, plus refreshed on push) |
+| PUT | `/notifications/{id}/read` | Mark one as read |
+| PUT | `/notifications/read-all` | Mark all as read |
+
+## Discord Webhooks
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/servers/{serverId}/webhooks` | List webhooks for a server |
+| POST | `/servers/{serverId}/webhooks` | Add — body `{ url, eventTypes? }`, must be `https://`, defaults to `["RaidDetected"]` |
+| DELETE | `/servers/{serverId}/webhooks/{id}` | Remove |
+
+Fires a real Discord embed (title/description/color-by-tier) on qualifying raids — requires `discordEnabled` in user settings too.
+
+## Web Push
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/push/vapid-public-key` | Public VAPID key, or `null` if the server has none configured |
+| POST | `/push/subscriptions` | Register a browser subscription — body `{ endpoint, p256dhKey, authKey }` |
+| POST | `/push/unsubscribe` | Body `{ endpoint }` |
+
+Reaches a subscribed browser even when the PWA is backgrounded or fully closed — requires `WebPush__PublicKey`/`PrivateKey` configured server-side and `pushEnabled` in user settings.
 
 ## Servers
 

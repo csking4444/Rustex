@@ -27,6 +27,7 @@ public class AppDbContext : DbContext
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<NotificationHistory> NotificationHistory => Set<NotificationHistory>();
     public DbSet<Webhook> Webhooks => Set<Webhook>();
+    public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
 
     public DbSet<MapData> Maps => Set<MapData>();
     public DbSet<Marker> Markers => Set<Marker>();
@@ -143,6 +144,12 @@ public class AppDbContext : DbContext
         b.Entity<Webhook>(e =>
         {
             e.Property(x => x.EventTypes).HasColumnType("text[]");
+        });
+
+        b.Entity<PushSubscription>(e =>
+        {
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.Endpoint).IsUnique();
         });
 
         // ---------- Maps ----------

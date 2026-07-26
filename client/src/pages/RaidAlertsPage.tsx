@@ -5,6 +5,7 @@ import { SkeletonList } from "@/components/ui/Skeleton";
 import { useServers } from "@/hooks/useServers";
 import { useRecentRaidEvents } from "@/hooks/useRaidEvents";
 import { useRaidAlarmSettings, useUpdateRaidAlarmSettings } from "@/hooks/useRaidAlarmSettings";
+import { DiscordWebhookPanel } from "@/components/raid/DiscordWebhookPanel";
 import type { RaidTier } from "@/types";
 
 const TIER_BADGE: Record<RaidTier, string> = {
@@ -65,8 +66,9 @@ export default function RaidAlertsPage() {
       {selectedServerId && (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <RaidAlarmSettingsForm serverId={selectedServerId} />
+          <DiscordWebhookPanel serverId={selectedServerId} />
 
-          <Card>
+          <Card className="xl:col-span-2">
             <CardHeader title="Recent Detections" subtitle="For the selected server" />
 
             {eventsLoading && <SkeletonList rows={4} />}

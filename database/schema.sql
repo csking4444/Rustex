@@ -231,6 +231,18 @@ create table webhooks (
     created_at  timestamptz not null default now()
 );
 
+-- Browser Push API (VAPID) subscriptions — one row per browser/device, lets alerts reach a
+-- backgrounded or fully closed PWA (SignalR only reaches live connections).
+create table push_subscriptions (
+    id           uuid primary key default gen_random_uuid(),
+    user_id      uuid not null references users(id) on delete cascade,
+    endpoint     varchar(1024) not null unique,
+    p256dh_key   varchar(256) not null,
+    auth_key     varchar(256) not null,
+    created_at   timestamptz not null default now()
+);
+create index idx_push_subscriptions_user on push_subscriptions(user_id);
+
 -- ============================================================
 -- Maps / markers
 -- ============================================================

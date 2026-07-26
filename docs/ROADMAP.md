@@ -40,10 +40,13 @@ Status legend: ✅ done · 🚧 in progress · ⬜ planned
   - **Desktop** (regular browser tab): a plain browser `Notification`.
   - ⚠️ **Honest limitation:** neither of these is a real VOIP/telephony call. A browser or PWA cannot register with iOS/Android's native call stack (CallKit/ConnectionService) — that requires a native app shell, which this repo doesn't build. The ring alert is the closest achievable approximation: loud, full-screen, hard to miss, but it won't ring through silent mode or show a system call UI. Revisit if/when a native wrapper (e.g. Capacitor) is added.
 - ✅ Per-user, per-server (or global) `CallAlertSetting` — min tier, cooldown, enable/disable — resolved by the dispatcher, defaulting to "alert on any Tier 1+" if unconfigured.
-- ⬜ Web Push for App-kind users who are fully backgrounded/closed, not just live-connected (SignalR only reaches open connections) — service worker (`client/public/sw.js`) exists but has no push handler yet.
+- ✅ **Web Push** for App-kind users who are fully backgrounded/closed, not just live-connected — `PushSubscription` entity, VAPID (RFC 8292) via the `WebPush` NuGet package, `client/public/sw.js` has real `push`/`notificationclick` handlers, opt-in from Settings. Requires `WebPush__PublicKey`/`WebPush__PrivateKey` configured (see `.env.example`) — a genuinely optional channel, silently skipped if unset. **Unverified**: this integration hasn't been through a real `dotnet build` — the WebPush package's exact API surface (constructor signatures, exception shape) was written from memory and should be double-checked on first build.
+- ✅ **Quiet hours** — timezone-aware window (handles midnight wraparound) on `UserSettings`, checked by `EmergencyAlertDispatcher` before the ring alert specifically (a muted ring still falls back to a desktop notification, doesn't go silent).
+- ✅ **Discord webhooks** — `IDiscordWebhookSender` posts a real Discord embed (title/description/color by tier) to per-server webhook URLs; full CRUD API + UI on the Raid Alerts page. Unlike Rust+/Steam, Discord's webhook format is fully documented — this is a complete implementation, not a stub.
+- ✅ **Notification center** wired end-to-end: `Notification` rows are queryable (`/api/notifications`), the sidebar bell badge shows a live unread count, and SignalR pushes trigger a refresh.
 - ⬜ Twilio/Vonage/Plivo PSTN calling as an additional opt-in channel (schema ready, `IVoiceCallProvider` implementations not started)
 - ⬜ Escalation state machine (retry → secondary contact → Discord → push), call history UI
-- ⬜ Quiet hours, smart filtering (min explosion count/duration, ignore PvE/Bradley/heli) beyond what `RaidAlarmSettings` already covers at the detection layer
+- ⬜ Smart filtering beyond tier/cooldown (min raid duration, ignore PvE/Bradley/heli) — no such event types exist in `SimulatedEventSource` yet, same gap as Phase 3
 
 ## Phase 5 — Rust Team Chat Automation 🚧
 
