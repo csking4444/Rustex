@@ -1,0 +1,28 @@
+# Production overlay: adds the TLS-terminating edge proxy in front of client + api,
+# and stops publishing the client/api ports directly (only the proxy is exposed).
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Requires real certificates mounted into ./docker/nginx/certs (see docker/nginx/nginx.conf).
+# The `!reset` tag below requires Docker Compose v2.24+ (Jan 2024) / Compose Spec merge tags.
+
+services:
+  api:
+    ports: !reset []
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+
+  client:
+    ports: !reset []
+
+  proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - client
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/nginx/certs:/etc/nginx/certs:ro
+    ports:
+      - "80:80"
+      - "443:443"

@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: rustex
+      POSTGRES_USER: rustex
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rustex"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./server
+      dockerfile: src/Rustex.Api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=rustex;Username=rustex;Password=changeme"
+      ConnectionStrings__Redis: "redis:6379"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in your shell or a .env file next to docker-compose.yml}"
+      Discord__ClientId: "${DISCORD_CLIENT_ID:-}"
+      Discord__ClientSecret: "${DISCORD_CLIENT_SECRET:-}"
+      Discord__RedirectUri: "${DISCORD_REDIRECT_URI:-http://localhost:8080/api/auth/discord/callback}"
+      Discord__FrontendCallbackUrl: "${DISCORD_FRONTEND_CALLBACK_URL:-http://localhost:5173/auth/callback}"
+      Encryption__FieldKey: "${ENCRYPTION_FIELD_KEY:-}"
+      Cors__AllowedOrigins__0: "${FRONTEND_ORIGIN:-http://localhost:5173}"
+    ports:
+      - "8080:8080"
+
+  client:
+    build:
+      context: ./client
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
+
+volumes:
+  postgres-data:
+  redis-data:
