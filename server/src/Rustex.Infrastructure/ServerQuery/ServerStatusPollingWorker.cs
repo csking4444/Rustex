@@ -114,16 +114,25 @@ public class ServerStatusPollingWorker : BackgroundService
 
         await db.SaveChangesAsync(ct);
 
-        if (broadcaster is not null)
+        var payload = new
         {
-            await broadcaster.BroadcastServerStatusUpdatedAsync(serverId, new
-            {
-                ServerId = serverId,
-                Status = server.Status,
-                Ping = result?.RoundTripMs,
-                Players = result?.Players,
-                MaxPlayers = result?.MaxPlayers,
-            }, ct);
-        }
+            ServerId = serverId,
+            Status = server.Status,
+            Ping = result?.RoundTripMs,
+            Players = result?.Players,
+            MaxPlayers = result?.MaxPlayers,
+            MapName = server.MapName,
+            At = DateTimeOffset.UtcNow,
+        };
+
+        if (broadcaster is not null)
+            await broadcaster.BroadcastServerStatusUpdatedAsync(serverId, payload, ct);
+
+        // Also cache it as live state. The broadcast above only reaches clients connected right
+        // now; this is what a client reconnecting between polls reads so it is immediately
+        // current rather than blank until the next tick.
+        var live = scope.ServiceProvider.GetService<ILiveSyncPublisher>();
+        if (live is not null)
+            await live.PublishAsync(LiveScope.Server(serverId), LiveSections.Status, payload, ct);
     }
 }

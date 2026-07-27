@@ -157,6 +157,29 @@ public class RustPlusTeamTrackingWorker : BackgroundService
         }
 
         await db.SaveChangesAsync(ct);
+
+        // Publish the roster as live state so the dashboard reflects it immediately, and so a
+        // client reconnecting mid-interval reads the current roster instead of waiting up to
+        // 30s for the next fallback poll.
+        var live = scope.ServiceProvider.GetService<ILiveSyncPublisher>();
+        if (live is not null)
+        {
+            await live.PublishAsync(LiveScope.Server(pairing.ServerId), LiveSections.Team, new
+            {
+                ServerId = pairing.ServerId,
+                At = DateTimeOffset.UtcNow,
+                Members = teamInfo.Members.Select(m => new
+                {
+                    m.SteamId,
+                    m.Name,
+                    m.IsOnline,
+                    m.IsAlive,
+                    Grid = GridConverter.ToGrid(m.X, m.Y, mapSize),
+                    m.X,
+                    m.Y,
+                }).ToList(),
+            }, ct);
+        }
     }
 
     private static async Task NotifyTransitionsAsync(

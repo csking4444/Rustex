@@ -15,6 +15,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="StackExchange.Redis" Version="2.8.16" />
+    <PackageReference Include="Stripe.net" Version="52.1.1" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.2" />
     <PackageReference Include="WebPush" Version="1.0.12" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
@@ -30,6 +31,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Rustex.Domain\Rustex.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Retry backoff and the pending-sync queue are internal on purpose: they are the retry
+         mechanism, not part of the surface workers call. Exposing them to the test project keeps
+         them testable without widening the public API. -->
+    <InternalsVisibleTo Include="Rustex.Api.Tests" />
   </ItemGroup>
 
   <ItemGroup>

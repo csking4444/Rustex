@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Rustex.Domain.RustPlus;
 
@@ -5,6 +6,8 @@ namespace Rustex.Api.Controllers;
 
 /// <summary>Public reference data (Rust item names) — no auth needed, same as looking up an item
 /// on a wiki. Backs autocomplete for vending search and shop alerts.</summary>
+// Public reference data — item names, same as a wiki lookup.
+[AllowAnonymous]
 [ApiController]
 [Route("api/rust-items")]
 public class RustItemsController : ControllerBase

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Rustex.Api.Controllers;
@@ -5,6 +6,8 @@ namespace Rustex.Api.Controllers;
 // Liveness/readiness is served by the built-in health check middleware at GET /health
 // (mapped in Program.cs via app.MapHealthChecks). This controller intentionally left as a
 // placeholder for future custom health/status payloads (e.g. version, uptime).
+// Version/health must answer an unauthenticated load balancer probe.
+[AllowAnonymous]
 [ApiController]
 [Route("api/version")]
 public class VersionController : ControllerBase

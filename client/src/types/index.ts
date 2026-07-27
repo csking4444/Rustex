@@ -297,3 +297,88 @@ export interface RustPlusChatMessage {
   isFromAssistant: boolean;
   sentAt: string;
 }
+
+// ---------- Billing ----------
+
+export type SubscriptionStatus =
+  | "Incomplete"
+  | "Trialing"
+  | "Active"
+  | "PastDue"
+  | "Canceled"
+  | "Unpaid"
+  | "Paused";
+
+export type BillingInterval = "Monthly" | "Yearly";
+
+export interface Plan {
+  tier: string;
+  name: string;
+  description: string;
+  monthlyCents: number;
+  yearlyCents: number;
+  serverLimit: number;
+  teamMemberLimit: number;
+  features: string[];
+  /** False when checkout is not wired up on this deployment — the UI must not offer a button
+   *  that cannot possibly work. */
+  purchasable: boolean;
+}
+
+export interface Subscription {
+  hasSubscription: boolean;
+  isEntitled: boolean;
+  tier: string | null;
+  planName: string | null;
+  status: SubscriptionStatus | null;
+  interval: BillingInterval | null;
+  /** Access granted directly rather than bought. Nothing is ever billed against it, so
+   *  interval / currentPeriodEnd / invoices are all genuinely absent. */
+  isComplimentary: boolean;
+  compReason: string | null;
+  currentPeriodEnd: string | null;
+  trialEndsAt: string | null;
+  cancelAtPeriodEnd: boolean;
+  canceledAt: string | null;
+  serverLimit: number;
+  teamMemberLimit: number;
+  features: string[];
+}
+
+export interface Entitlement {
+  isEntitled: boolean;
+  tier: string | null;
+  planName: string | null;
+  status: SubscriptionStatus | null;
+  isComplimentary: boolean;
+  interval: BillingInterval | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  serverLimit: number;
+  teamMemberLimit: number;
+  features: string[];
+}
+
+export interface Invoice {
+  id: string;
+  number: string | null;
+  status: "Draft" | "Open" | "Paid" | "Uncollectible" | "Void";
+  amountDueCents: number;
+  amountPaidCents: number;
+  currency: string;
+  hostedInvoiceUrl: string | null;
+  invoicePdfUrl: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  issuedAt: string | null;
+  paidAt: string | null;
+}
+
+/** Display-only. The API never returns a full card number — card data goes straight from the
+ *  browser to the payment provider's hosted pages and never touches our servers. */
+export interface PaymentMethod {
+  brand: string | null;
+  last4: string | null;
+  expMonth: number | null;
+  expYear: number | null;
+}

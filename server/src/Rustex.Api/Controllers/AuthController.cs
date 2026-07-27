@@ -7,6 +7,7 @@ using Rustex.Api.Dtos;
 using Rustex.Domain.Abstractions;
 using Rustex.Domain.Entities;
 using Rustex.Infrastructure.Auth;
+using Rustex.Infrastructure.Billing;
 using Rustex.Infrastructure.Persistence;
 
 namespace Rustex.Api.Controllers;
@@ -28,6 +29,7 @@ public class AuthController : ControllerBase
     private readonly DiscordOAuthOptions _discordOptions;
     private readonly GoogleOAuthOptions _googleOptions;
     private readonly SteamAuthOptions _steamOptions;
+    private readonly IComplimentaryGrantReconciler _grants;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -42,6 +44,7 @@ public class AuthController : ControllerBase
         IOptions<DiscordOAuthOptions> discordOptions,
         IOptions<GoogleOAuthOptions> googleOptions,
         IOptions<SteamAuthOptions> steamOptions,
+        IComplimentaryGrantReconciler grants,
         ILogger<AuthController> logger)
     {
         _discord = discord;
@@ -55,6 +58,7 @@ public class AuthController : ControllerBase
         _discordOptions = discordOptions.Value;
         _googleOptions = googleOptions.Value;
         _steamOptions = steamOptions.Value;
+        _grants = grants;
         _logger = logger;
     }
 
@@ -63,6 +67,7 @@ public class AuthController : ControllerBase
     // ---------- Email + password ----------
 
     [HttpPost("register")]
+    [AllowAnonymous]
     public async Task<ActionResult<TokenResponse>> Register([FromBody] RegisterRequest request, CancellationToken ct)
     {
         var email = request.Email.Trim().ToLowerInvariant();
@@ -95,6 +100,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [AllowAnonymous]
     public async Task<ActionResult<TokenResponse>> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         var email = request.Email.Trim().ToLowerInvariant();
@@ -112,6 +118,7 @@ public class AuthController : ControllerBase
     // ---------- Discord OAuth2 ----------
 
     [HttpGet("discord/login")]
+    [AllowAnonymous]
     public IActionResult DiscordLogin()
     {
         var state = Guid.NewGuid().ToString("N");
@@ -127,6 +134,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpGet("discord/callback")]
+    [AllowAnonymous]
     public async Task<IActionResult> DiscordCallback([FromQuery] string code, [FromQuery] string state, CancellationToken ct)
     {
         if (!Request.Cookies.TryGetValue(StateCookieName, out var expectedState) || expectedState != state)
@@ -174,6 +182,7 @@ public class AuthController : ControllerBase
     // ---------- Google OAuth2 ----------
 
     [HttpGet("google/login")]
+    [AllowAnonymous]
     public IActionResult GoogleLogin()
     {
         var state = Guid.NewGuid().ToString("N");
@@ -189,6 +198,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpGet("google/callback")]
+    [AllowAnonymous]
     public async Task<IActionResult> GoogleCallback([FromQuery] string code, [FromQuery] string state, CancellationToken ct)
     {
         if (!Request.Cookies.TryGetValue(StateCookieName, out var expectedState) || expectedState != state)
@@ -252,6 +262,7 @@ public class AuthController : ControllerBase
     /// a Steam session. Without it Steam auto-approves and bounces straight back — correct SSO, but
     /// it makes the button look like it did nothing, and gives no way to pick a different account.</param>
     [HttpGet("steam/login")]
+    [AllowAnonymous]
     public async Task<IActionResult> SteamLogin([FromQuery] bool force = false)
     {
         if (!_steam.IsConfigured)
@@ -296,6 +307,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpGet("steam/callback")]
+    [AllowAnonymous]
     public async Task<IActionResult> SteamCallback(CancellationToken ct)
     {
         var query = Request.Query.ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
@@ -381,6 +393,11 @@ public class AuthController : ControllerBase
 
         await _db.SaveChangesAsync(ct);
 
+        // A complimentary plan may have been configured before this person ever signed in,
+        // in which case the startup pass could not match it to an account. Now it can.
+        try { await _grants.ReconcileAsync(steamId, ct); }
+        catch (Exception ex) { _logger.LogError(ex, "Complimentary grant check failed for {SteamId}", steamId); }
+
         var tokens = await IssueTokenPairAsync(loginUser, ct);
         return Redirect(BuildFrontendRedirect(_steamOptions.FrontendCallbackUrl, tokens));
     }
@@ -400,6 +417,7 @@ public class AuthController : ControllerBase
     // ---------- Shared ----------
 
     [HttpPost("refresh")]
+    [AllowAnonymous]
     public async Task<ActionResult<TokenResponse>> Refresh([FromBody] RefreshRequest request, CancellationToken ct)
     {
         var hash = _jwt.HashRefreshToken(request.RefreshToken);
@@ -416,6 +434,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("logout")]
+    [AllowAnonymous]
     public async Task<IActionResult> Logout([FromBody] RefreshRequest request, CancellationToken ct)
     {
         var hash = _jwt.HashRefreshToken(request.RefreshToken);

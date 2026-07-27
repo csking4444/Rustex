@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Rustex.Api.Auth;
 using Rustex.Domain.Abstractions;
+using Rustex.Domain.Billing;
 
 namespace Rustex.Api.Hubs;
 
@@ -9,8 +11,24 @@ namespace Rustex.Api.Hubs;
 public class DashboardHub : Hub
 {
     private readonly IClientConnectionRegistry _connectionRegistry;
+    private readonly ILiveScopeAuthorizer _scopeAuthorizer;
+    private readonly ILiveStateStore _liveState;
+    private readonly ISubscriptionService _subscriptions;
+    private readonly ILogger<DashboardHub> _log;
 
-    public DashboardHub(IClientConnectionRegistry connectionRegistry) => _connectionRegistry = connectionRegistry;
+    public DashboardHub(
+        IClientConnectionRegistry connectionRegistry,
+        ILiveScopeAuthorizer scopeAuthorizer,
+        ILiveStateStore liveState,
+        ISubscriptionService subscriptions,
+        ILogger<DashboardHub> log)
+    {
+        _connectionRegistry = connectionRegistry;
+        _scopeAuthorizer = scopeAuthorizer;
+        _liveState = liveState;
+        _subscriptions = subscriptions;
+        _log = log;
+    }
 
     public override async Task OnConnectedAsync()
     {
@@ -35,11 +53,59 @@ public class DashboardHub : Hub
         await base.OnDisconnectedAsync(exception);
     }
 
-    public async Task Subscribe(string serverId) =>
-        await Groups.AddToGroupAsync(Context.ConnectionId, ServerGroupName(serverId));
+    /// <summary>Joins a live scope after checking the caller may actually see it.
+    ///
+    /// The authorization call is the important part: SignalR adds a connection to whatever group
+    /// name it is given, so without it any signed-in user could pass another account's server id
+    /// and start receiving their live data.</summary>
+    public async Task<SubscribeResult> SubscribeScope(string scope)
+    {
+        var userId = CurrentUserId;
+        if (userId is null) return SubscribeResult.Denied("Not signed in.");
 
-    public async Task Unsubscribe(string serverId) =>
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, ServerGroupName(serverId));
+        if (!LiveScope.TryParse(scope, out var parsed))
+            return SubscribeResult.Denied("Malformed scope.");
+
+        if (!await _scopeAuthorizer.CanAccessAsync(userId.Value, parsed, Context.ConnectionAborted))
+        {
+            _log.LogWarning("User {UserId} was denied live scope {Scope}", userId, scope);
+            // Same message whether the scope does not exist or belongs to someone else — telling
+            // them apart would let a caller enumerate which server ids are real.
+            return SubscribeResult.Denied("You do not have access to that scope.");
+        }
+
+        // Paid product: an expired or cancelled plan must stop the live feed too, not just the
+        // REST endpoints, or the dashboard would keep updating for a lapsed account.
+        var entitlement = await _subscriptions.GetEntitlementAsync(userId.Value, Context.ConnectionAborted);
+        if (!entitlement.IsEntitled)
+            return SubscribeResult.Denied("An active plan is required for live updates.");
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(parsed));
+
+        // Hand back the current snapshot in the same round trip. A client that reconnects is
+        // immediately correct rather than showing stale data until the next push — which for the
+        // 30s team poll could otherwise be half a minute of wrong information on screen.
+        var snapshot = await _liveState.GetSnapshotAsync(parsed, Context.ConnectionAborted);
+        return SubscribeResult.Ok(snapshot);
+    }
+
+    public async Task UnsubscribeScope(string scope)
+    {
+        if (LiveScope.TryParse(scope, out var parsed))
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, GroupName(parsed));
+    }
+
+    /// <summary>Re-fetches current state. Clients call this when they notice a version gap in the
+    /// updates they received, which means a message was missed and local state cannot be trusted.</summary>
+    public async Task<LiveSnapshot?> GetSnapshot(string scope)
+    {
+        var userId = CurrentUserId;
+        if (userId is null) return null;
+        if (!LiveScope.TryParse(scope, out var parsed)) return null;
+        if (!await _scopeAuthorizer.CanAccessAsync(userId.Value, parsed, Context.ConnectionAborted)) return null;
+
+        return await _liveState.GetSnapshotAsync(parsed, Context.ConnectionAborted);
+    }
 
     private Guid? CurrentUserId
     {
@@ -50,6 +116,15 @@ public class DashboardHub : Hub
         }
     }
 
+    public static string GroupName(LiveScope scope) => scope.ToString();
     public static string ServerGroupName(string serverId) => $"server:{serverId}";
     public static string UserGroupName(Guid userId) => $"user:{userId}";
+}
+
+/// <summary>Result of a subscribe attempt. Explicit rather than an exception so the client gets a
+/// usable reason and can decide between "upgrade your plan" and "this server is gone".</summary>
+public sealed record SubscribeResult(bool Allowed, string? Reason, LiveSnapshot? Snapshot)
+{
+    public static SubscribeResult Ok(LiveSnapshot? snapshot) => new(true, null, snapshot);
+    public static SubscribeResult Denied(string reason) => new(false, reason, null);
 }

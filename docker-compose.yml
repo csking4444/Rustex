@@ -65,6 +65,29 @@ services:
       WebPush__Subject: "${WEBPUSH_SUBJECT:-mailto:admin@example.com}"
       RustPlus__EnableFcmListener: "${RUSTPLUS_ENABLE_FCM_LISTENER:-false}"
       Cors__AllowedOrigins__0: "${FRONTEND_ORIGIN:-http://localhost:5173}"
+      App__FrontendUrl: "${FRONTEND_ORIGIN:-http://localhost:5173}"
+      # Billing. Without a secret key the API still runs — the plans endpoint reports
+      # purchasable:false and the UI says checkout is not connected, rather than offering a
+      # button that cannot work. Test keys (sk_test_/whsec_) never move real money.
+      Stripe__SecretKey: "${STRIPE_SECRET_KEY:-}"
+      Stripe__WebhookSecret: "${STRIPE_WEBHOOK_SECRET:-}"
+      Stripe__Prices__scout__Monthly: "${STRIPE_PRICE_SCOUT_MONTHLY:-}"
+      Stripe__Prices__scout__Yearly: "${STRIPE_PRICE_SCOUT_YEARLY:-}"
+      Stripe__Prices__raider__Monthly: "${STRIPE_PRICE_RAIDER_MONTHLY:-}"
+      Stripe__Prices__raider__Yearly: "${STRIPE_PRICE_RAIDER_YEARLY:-}"
+      Stripe__Prices__clan__Monthly: "${STRIPE_PRICE_CLAN_MONTHLY:-}"
+      Stripe__Prices__clan__Yearly: "${STRIPE_PRICE_CLAN_YEARLY:-}"
+      # Complimentary access by SteamID — the replacement for the static site's COMPED_ACCOUNTS.
+      # Applied at startup and again on each Steam login, so it works whether the grant is
+      # configured before or after that person first signs in.
+      # Add more by continuing the numbering (__2__, __3__, …); gaps are not allowed, the binder
+      # stops at the first missing index.
+      Billing__ComplimentaryGrants__0__SteamId: "${COMP_STEAM_ID:-}"
+      Billing__ComplimentaryGrants__0__Tier: "${COMP_TIER:-}"
+      Billing__ComplimentaryGrants__0__Reason: "${COMP_REASON:-}"
+      Billing__ComplimentaryGrants__1__SteamId: "${COMP_STEAM_ID_2:-}"
+      Billing__ComplimentaryGrants__1__Tier: "${COMP_TIER_2:-}"
+      Billing__ComplimentaryGrants__1__Reason: "${COMP_REASON_2:-}"
     ports:
       - "8080:8080"
 

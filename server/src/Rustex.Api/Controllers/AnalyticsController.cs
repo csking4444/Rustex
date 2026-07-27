@@ -2,6 +2,8 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Rustex.Api.Auth;
+using Rustex.Domain.Billing;
 using Rustex.Api.Dtos;
 using Rustex.Domain;
 using Rustex.Infrastructure.Persistence;
@@ -18,6 +20,7 @@ namespace Rustex.Api.Controllers;
 [ApiController]
 [Route("api/servers/{serverId:guid}/analytics")]
 [Authorize]
+[RequiresFeature(Features.Analytics)]
 public class AnalyticsController : ControllerBase
 {
     private readonly AppDbContext _db;

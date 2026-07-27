@@ -3,14 +3,17 @@ using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authorization;
 using Rustex.Api.Auth;
 using Rustex.Api.HealthChecks;
 using Rustex.Api.Hubs;
 using Rustex.Api.Middleware;
 using Rustex.Api.Startup;
 using Rustex.Domain.Abstractions;
+using Rustex.Domain.Billing;
 using Rustex.Domain.RustPlus;
 using Rustex.Infrastructure.Auth;
+using Rustex.Infrastructure.Billing;
 using Rustex.Infrastructure.Caching;
 using Rustex.Infrastructure.Emergency;
 using Rustex.Infrastructure.EventIngestion;
@@ -27,6 +30,13 @@ using StackExchange.Redis;
 DotEnvLoader.Load(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".env"));
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Managed hosts (Railway, Render, Fly, App Service) assign the port at run time via $PORT rather
+// than letting the process choose. Honour it when present so the same image runs unchanged both
+// locally (where the Dockerfile's ASPNETCORE_URLS applies) and on a platform.
+var assignedPort = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(assignedPort) && int.TryParse(assignedPort, out _))
+    builder.WebHost.UseUrls($"http://+:{assignedPort}");
 
 builder.Configuration.AddEnvironmentVariables();
 
@@ -51,9 +61,15 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
 builder.Services.AddSingleton<IRedisCacheService, RedisCacheService>();
 
 // ---------- Security ----------
+// Fail fast rather than registering nothing: without this key the Rust+ credential store cannot
+// encrypt, and the old conditional registration turned that into an obscure DI resolution error
+// at the moment a user tried to pair — long after the misconfiguration could have been caught.
 var encryptionKey = builder.Configuration["Encryption:FieldKey"];
-if (!string.IsNullOrWhiteSpace(encryptionKey))
-    builder.Services.AddSingleton<IEncryptionService>(_ => new AesGcmEncryptionService(encryptionKey));
+if (string.IsNullOrWhiteSpace(encryptionKey))
+    throw new InvalidOperationException(
+        "Encryption:FieldKey is not configured. Rust+ credentials are stored encrypted and cannot be " +
+        "handled without it. Generate one with: openssl rand -base64 32 (see .env.example).");
+builder.Services.AddSingleton<IEncryptionService>(_ => new AesGcmEncryptionService(encryptionKey));
 
 // ---------- Auth ----------
 builder.Services.AddHttpClient<IDiscordOAuthService, DiscordOAuthService>();
@@ -121,6 +137,13 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(RustPlusPairingAuthConstants.CredentialWritePolicy, policy => policy
         .AddAuthenticationSchemes(RustPlusPairingAuthConstants.SchemeName)
         .RequireClaim("scope", RustPlusPairingAuthConstants.CredentialWriteScope));
+
+    // Authenticated by default across the whole API. Previously every controller had to remember
+    // its own [Authorize], so a new one that forgot was silently public; now anything reachable
+    // without a login has to say so explicitly with [AllowAnonymous], which is reviewable.
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
 });
 
 // ---------- CORS ----------
@@ -166,6 +189,30 @@ builder.Services.AddHostedService<RustPlusSmartDevicesWorker>();
 // unverified and known-wrong (it sent a raw FCM token where Facepunch expects an Expo token).
 // See docs/RUSTPLUS.md and the plan at zany-napping-seal.md for the replacement design.
 
+// ---------- Live synchronisation ----------
+// Snapshot cache + fan-out + retry. Producers (status poller, team tracker) call
+// ILiveSyncPublisher; connected clients receive "LiveUpdate", and reconnecting ones read the
+// cached snapshot back through DashboardHub.SubscribeScope so they are current immediately.
+builder.Services.AddSingleton<ILiveStateStore, RedisLiveStateStore>();
+builder.Services.AddSingleton<ILiveBroadcaster, SignalRLiveBroadcaster>();
+builder.Services.AddSingleton<SyncRetryQueue>();
+builder.Services.AddSingleton<ILiveSyncPublisher, LiveSyncPublisher>();
+builder.Services.AddHostedService<SyncRetryWorker>();
+builder.Services.AddScoped<ILiveScopeAuthorizer, LiveScopeAuthorizer>();
+
+// ---------- Billing ----------
+builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
+builder.Services.AddSingleton<IPaymentProvider, StripePaymentProvider>();
+builder.Services.AddSingleton<IWebhookVerifier, StripeWebhookVerifier>();
+builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
+
+// Operator-granted plans, keyed by SteamID. Replaces the static site's COMPED_ACCOUNTS env var
+// with a real Subscription row that can be listed and revoked.
+builder.Services.Configure<ComplimentaryGrantOptions>(
+    builder.Configuration.GetSection(ComplimentaryGrantOptions.SectionName));
+builder.Services.AddScoped<IComplimentaryGrantReconciler, ComplimentaryGrantReconciler>();
+builder.Services.AddHostedService<ComplimentaryGrantStartupWorker>();
+
 builder.Services.AddSingleton<IClientConnectionRegistry, InMemoryClientConnectionRegistry>();
 builder.Services.AddHttpClient<IDiscordWebhookSender, DiscordWebhookSender>();
 builder.Services.Configure<WebPushOptions>(builder.Configuration.GetSection(WebPushOptions.SectionName));
@@ -191,6 +238,38 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+// Apply pending migrations on boot. Off by default and opt-in via Database:AutoMigrate, because
+// two replicas starting together would race each other through the same migration. On a
+// single-instance host (Railway, Fly, Render) turning it on removes the separate migration step
+// that is otherwise the most common reason a first deploy comes up 500ing on every query.
+if (app.Configuration.GetValue<bool>("Database:AutoMigrate"))
+{
+    using var scope = app.Services.CreateScope();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    try
+    {
+        var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+        if (pending.Count == 0)
+        {
+            logger.LogInformation("Database schema is up to date");
+        }
+        else
+        {
+            logger.LogInformation("Applying {Count} pending migration(s): {Names}", pending.Count, string.Join(", ", pending));
+            await db.Database.MigrateAsync();
+            logger.LogInformation("Migrations applied");
+        }
+    }
+    catch (Exception ex)
+    {
+        // Refuse to serve on a schema we could not bring up to date — a half-migrated database
+        // fails later, per-request, in ways that are far harder to diagnose than a failed boot.
+        logger.LogCritical(ex, "Database migration failed — refusing to start");
+        throw;
+    }
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -199,6 +278,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseSerilogRequestLogging();
 app.UseSecurityHeaders();
+// Before rate limiting and auth so anything either of those throws is also shaped into the same
+// JSON envelope rather than escaping as an unhandled 500 with a stack trace.
+app.UseApiExceptionHandling();
 app.UseIpRateLimiting();
 
 if (!app.Environment.IsDevelopment())
@@ -210,6 +292,8 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<DashboardHub>("/hubs/dashboard");
-app.MapHealthChecks("/health");
+// Explicitly anonymous: the fallback policy above otherwise applies here too, and a health
+// endpoint that 401s defeats the point — container and load-balancer probes cannot authenticate.
+app.MapHealthChecks("/health").AllowAnonymous();
 
 app.Run();
