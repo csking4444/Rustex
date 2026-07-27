@@ -70,8 +70,10 @@ upcoming vending-alert poller, chat assistant) don't depend on an HTTP request h
 first.
 
 `RustPlusConnectionManager.OnBroadcast` is the fan-out point for live pushes — team position
-changes, chat, entity state — tagged with the pairing id. Nothing subscribes to it yet; that
-lands with Team Tracking / Chat Assistant / Smart Devices (Phase 6 of the plan).
+changes, chat, entity state — tagged with the pairing id. Three independent Phase 6 workers each
+subscribe to it directly (`RustPlusTeamTrackingWorker`, `RustPlusChatAssistantWorker`,
+`RustPlusSmartDevicesWorker` for `entityChanged`), each with its own `Channel<>` so one slow
+consumer can't back-pressure another.
 
 ## 3. Manual pairing — working today, unchanged in spirit
 
@@ -147,6 +149,73 @@ package assumes, and whether a live push actually arrives end-to-end. All of tha
 run against a live Steam account and Rust server to confirm — see the manual test procedure in
 the plan document.
 
+## 6. The five features
+
+All built on the session/broadcast infrastructure above, and all functional with manual pairing
+alone — none of them require the FCM auto-pairing stack from section 4, only a paired session.
+
+**Team Tracking** (`RustPlusTeamTrackingWorker`) — syncs `RustPlusTeamMemberState` (unique per
+`ServerId, SteamId`) from the `teamChanged` broadcast plus a 30s fallback poll (covers the gap
+right after a reconnect, or a session where `setSubscription` silently failed). Transition
+detection is a pure function, `Rustex.Domain.RustPlus.TeamStatusDetector` — death/revival takes
+priority over online/offline when both flip in the same tick, so a player who dies and disconnects
+in one update reports as a death, not a departure. Fires through `INotificationDispatcher`, not
+through the existing `MessageTemplate`/`TemplateRenderer` in-game-chat pipeline — routing raid-style
+`ChatEventTypes` through the team's configured chat templates for these would be the natural next
+step, but doing that at the same time as building the roster/notification path risked confusing two
+unrelated delivery mechanisms this late in the build. `GET team-state` serves the DB rows; `GET team`
+still exists for a live round-trip.
+
+**Vending Search** (`RustPlusVendingPollWorker`) — polls `getMapMarkers` for *every* actively
+connected pairing (not just ones with an enabled Shop Alert — vending search needs fresh data on
+its own), keeps `VendingMachineSnapshot`/`VendingListing` in sync via a full per-server resync each
+tick, and computes `Rustex.Domain.RustPlus.VendingDiff` against the previous snapshot. `getMapMarkers`
+includes a marker per online player, which can be a few hundred KB on a full server — the 60s
+interval trades alert latency for bandwidth. `GET vending/search` reads only the DB.
+
+**Shop Alerts** — `ShopAlert` entity + CRUD (`RustPlusShopAlertsController`), matched against
+`VendingDiff` output by the same poll worker: kind (new listing / price drop / restock) must be
+individually enabled on the alert, plus optional item id/name-contains/max-cost/min-stock filters
+and a per-alert cooldown. `SoldOut`/`MachineDisappeared` diff kinds are deliberately not alertable —
+no flag exists for them, since neither is actionable the way "it's now available" is.
+
+**Smart Devices** (`RustPlusSmartDevicesWorker`) — populates `RustPlusSmartDevice` from FCM
+entity-pairing pushes (`RustPlusFcmEventBus`) or manual entry (`RustPlusDevicesController`), and
+keeps `LastKnownValue`/`LastKnownCapacity` in sync from `entityChanged` broadcasts. A Smart Alarm
+going `value == true` — from either the live broadcast *or* the independent `OnAlarmTriggered` FCM
+push, whichever arrives — raises a real `RaidEvent` with `Source = EventSourceKind.RustPlus`,
+Tier 1, deduped per-server within a 10-second window across both paths. `AlarmNotification` (the FCM
+push shape) carries no entity id, only a server id — so the dedupe key is per-server, not
+per-device; a base with two alarms tripping within 10s of each other raises one event, which the
+existing raid-alarm pipeline's own time-window clustering already treats as one incident anyway.
+This supersedes the old `IRustPlusNotificationListener` stub, deleted in this phase.
+
+**Chat Assistant** (`RustPlusChatAssistantWorker`) — ingests every `teamMessage` broadcast into
+`RustPlusChatMessage` and answers `!help !pop !time !team !alerts !wipe !pos !device <name>` via
+`Rustex.Domain.RustPlus.TeamChatCommandParser`, rate-limited per pairing (≥3s between replies,
+≤20/min). The loop guard lives in the parser itself (`senderSteamId == botSteamId` → no match) —
+both the worker's own auto-replies *and* messages sent from the web dashboard
+(`POST .../rustplus/chat`) are recorded by whoever sent them, and the broadcast handler skips
+messages from the pairing's own identity so a same-message echo (if Rust+ sends one back to the
+sender) can't double-record it.
+
+**Frontend** — `/rust-plus` (`RustPlusPage.tsx`): server selector, an account-level auto-pairing
+setup card (`RustPlusAccountSetup`, one-time code generation), a per-server manual pairing form
+when no pairing exists yet, and a tab per feature under `components/rustplus/`. `useRustPlusRealtime`
+invalidates the relevant tab's query on the existing `NotificationCreated` SignalR push instead of
+each tab needing its own hub subscription. Smoke-tested end-to-end against the real API + Postgres
+(register → add server → manual pair → create a shop alert → all five tabs render) — not covered by
+an automated test yet.
+
+**Test coverage for this phase:** the pure decision logic is unit-tested (`TeamStatusDetector`,
+`VendingDiff`, `TeamChatCommandParser`, `RustPlusTokenFormat`, `GridConverter`). The five new
+workers themselves (`RustPlusTeamTrackingWorker`, `RustPlusVendingPollWorker`,
+`RustPlusSmartDevicesWorker`, `RustPlusChatAssistantWorker`) are **not** — they're thin
+orchestration over already-tested pure logic plus EF Core/`RustPlusConnectionManager` calls, and
+testing them properly needs either a fake `RustPlusClient`/local test WebSocket or an EF InMemory
+harness per worker, neither of which exists yet. `RustServerPairingHandler` (Phase 5) is the
+existing example of the pattern to follow if/when that's built out.
+
 ## Where things are in the code
 
 - `server/src/Rustex.Infrastructure/RustPlus/Proto/rustplus.proto` — corrected schema
@@ -158,3 +227,11 @@ the plan document.
 - `server/src/Rustex.Api/Controllers/RustPlusAccountController.cs` + `RustPlusAccount.cs` entities — link-code/credential flow
 - `server/src/Rustex.Infrastructure/RustPlus/Fcm/RustPlusFcmListenerWorker.cs` + `RustPlusFcmEventBus.cs` + `RustServerPairingHandler.cs` — the persistent listener
 - `tools/Rustex.PairingHelper/` — the `rustex-pair` local helper (`dotnet tool` / standalone build)
+- `server/src/Rustex.Infrastructure/RustPlus/RustPlusTeamTrackingWorker.cs` + `Rustex.Domain/RustPlus/TeamStatusTransition.cs` — Team Tracking
+- `server/src/Rustex.Infrastructure/RustPlus/RustPlusVendingPollWorker.cs` + `Rustex.Domain/RustPlus/VendingDiff.cs` — Vending Search + Shop Alerts
+- `server/src/Rustex.Api/Controllers/RustPlusShopAlertsController.cs` — Shop Alert CRUD
+- `server/src/Rustex.Infrastructure/RustPlus/RustPlusSmartDevicesWorker.cs` + `server/src/Rustex.Api/Controllers/RustPlusDevicesController.cs` — Smart Devices
+- `server/src/Rustex.Infrastructure/RustPlus/RustPlusChatAssistantWorker.cs` + `Rustex.Domain/RustPlus/TeamChatCommandParser.cs` — Chat Assistant
+- `server/src/Rustex.Domain/Entities/RustPlusFeatures.cs` — the six Phase 6 entities (team member state, vending snapshots/listings, shop alerts, smart devices, chat messages)
+- `server/src/Rustex.Domain/Abstractions/INotificationDispatcher.cs` + `Rustex.Infrastructure/Notifications/NotificationDispatcher.cs` — shared notification fan-out (in-app/SignalR, Discord, Web Push) used by all three Phase 6 workers that notify
+- `client/src/pages/RustPlusPage.tsx` + `client/src/components/rustplus/` + `client/src/hooks/useRustPlus*.ts` — the frontend

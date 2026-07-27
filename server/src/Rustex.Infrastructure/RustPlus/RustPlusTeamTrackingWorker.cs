@@ -163,39 +163,23 @@ public class RustPlusTeamTrackingWorker : BackgroundService
         INotificationDispatcher dispatcher, RustPlusPairing pairing, AppTeamInfo.Types.Member member,
         string? grid, bool wasOnline, bool wasAlive, CancellationToken ct)
     {
-        string? eventType = null;
-        string? body = null;
-        var severity = NotificationSeverity.Info;
+        var transition = TeamStatusDetector.Detect(wasOnline, wasAlive, member.IsOnline, member.IsAlive);
+        if (transition is null) return;
 
-        if (!wasAlive && member.IsAlive)
+        var (eventType, body, severity) = transition switch
         {
-            eventType = "TeamMemberRevived";
-            body = $"{member.Name} was revived.";
-        }
-        else if (wasAlive && !member.IsAlive)
-        {
-            eventType = "TeamMemberDown";
-            body = $"{member.Name} died near {grid ?? "an unknown grid"}.";
-            severity = NotificationSeverity.Warning;
-        }
-        else if (!wasOnline && member.IsOnline)
-        {
-            eventType = "TeamMemberOnline";
-            body = $"{member.Name} came online.";
-        }
-        else if (wasOnline && !member.IsOnline)
-        {
-            eventType = "TeamMemberOffline";
-            body = $"{member.Name} went offline.";
-        }
-
-        if (eventType is null) return;
+            TeamStatusTransition.Revived => ("TeamMemberRevived", $"{member.Name} was revived.", NotificationSeverity.Info),
+            TeamStatusTransition.Down => ("TeamMemberDown", $"{member.Name} died near {grid ?? "an unknown grid"}.", NotificationSeverity.Warning),
+            TeamStatusTransition.Online => ("TeamMemberOnline", $"{member.Name} came online.", NotificationSeverity.Info),
+            TeamStatusTransition.Offline => ("TeamMemberOffline", $"{member.Name} went offline.", NotificationSeverity.Info),
+            _ => throw new InvalidOperationException("Unreachable — all TeamStatusTransition values are handled above."),
+        };
 
         await dispatcher.DispatchAsync(new DispatchNotificationRequest(
             UserId: pairing.UserId,
             Type: "RustPlusTeamStatus",
             Title: member.Name,
-            Body: body!,
+            Body: body,
             Severity: severity,
             ServerId: pairing.ServerId,
             WebhookEventType: eventType,

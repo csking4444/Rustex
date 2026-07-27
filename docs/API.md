@@ -8,13 +8,23 @@ Only implemented endpoints are listed. Everything else in the original spec's AP
 
 | Method | Path | Description |
 |---|---|---|
+| POST | `/auth/register` | Body `{ email, username, password }` (password ≥8 chars) → token pair |
+| POST | `/auth/login` | Body `{ email, password }` → token pair |
 | GET | `/auth/discord/login` | Redirects to Discord OAuth2 authorize URL |
 | GET | `/auth/discord/callback` | OAuth2 callback; exchanges code, upserts user, issues JWT + refresh token, redirects to frontend with tokens |
+| GET | `/auth/google/login` | Redirects to Google OAuth2 consent screen |
+| GET | `/auth/google/callback` | Callback; upserts user by Google subject, issues tokens |
+| GET | `/auth/steam/login` | Redirects to Steam OpenID; callback creates-or-signs-in by SteamId64 (no auto-link to an existing email/password account — Steam gives no verifiable email) |
+| POST | `/auth/steam/link/start` | `[Authorize]` — returns `{ url }` to link Steam to the *current* signed-in account (intent is pre-encoded into the OpenID nonce, since a top-level redirect can't carry a bearer header) |
+| DELETE | `/auth/steam/link` | `[Authorize]` — unlink; refused if it's the account's only credential |
+| GET | `/auth/steam/callback` | Shared callback for both login and link, branching on the nonce's `Purpose`. Replay-guarded (`TrySetIfAbsentAsync` on the nonce), validates `openid.signed` includes `op_endpoint,return_to,claimed_id,identity,response_nonce,assoc_handle`, `return_to` matches config, and the nonce timestamp is within ±5 min |
 | POST | `/auth/refresh` | Body: `{ refreshToken }` → new access + refresh token pair (rotates the refresh token) |
 | POST | `/auth/logout` | Revokes the current refresh token/session |
 | GET | `/users/me` | Current authenticated user + profile (requires `Authorization: Bearer <token>`) |
 | GET | `/users/me/settings` | Notification channel toggles + quiet hours (auto-created with defaults on first access) |
 | PUT | `/users/me/settings` | Update — `quietHoursStart`/`quietHoursEnd` are `"HH:mm"` strings or null (both or neither) |
+
+All three OAuth providers redirect back to the frontend with tokens in the URL fragment; `AuthCallbackPage.tsx` scrubs them via `history.replaceState` immediately after reading them.
 
 ## Notifications
 
@@ -119,6 +129,54 @@ No delivery yet — see the note in `docs/ARCHITECTURE.md#team-chat-automation-p
 | GET | `/servers/{serverId}/raid-alarm-settings` | Current thresholds/window/cooldown for a server (defaults if never configured) |
 | PUT | `/servers/{serverId}/raid-alarm-settings` | Update thresholds — `isEnabled`, `tier1Threshold`/`tier2Threshold`/`tier3Threshold` (must be non-decreasing), `timeWindowSeconds`, `clusterRadius`, `cooldownSeconds` |
 
+## Rust+
+
+Steam64 ids (`playerId`, `steamId`) are serialized as JSON **strings**, not numbers — they exceed
+`Number.MAX_SAFE_INTEGER` and would silently lose precision otherwise (see
+`Rustex.Api.Serialization.UlongStringConverter`, registered globally).
+
+### Account-level setup (`/rustplus`)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/rustplus/link-codes` | `[Authorize]` — generates a one-time Crockford-base32 code (`RSTX-XXXX-XXXX`, 10-min TTL) for the `rustex-pair` local helper; retires any earlier unconsumed code |
+| POST | `/rustplus/link-codes/redeem` | `[AllowAnonymous]` — body `{ code }` → a 30-minute JWT on a separate `Pairing` scheme that can *only* call `PUT credentials` |
+| PUT | `/rustplus/credentials` | Scoped-JWT only — uploads FCM/GCM/Expo push credentials acquired by `rustex-pair` |
+| GET | `/rustplus/credentials/status` | `[Authorize]` — `{ hasCredentials, status: Active\|NeedsReauth\|Disabled\|null, registeredAt, expiresAt, lastNotificationAt, steamId }`. Never returns the credentials themselves |
+| DELETE | `/rustplus/credentials` | `[Authorize]` — deletes stored credentials, stops the listener session |
+
+### Per-server (`/servers/{serverId}/rustplus`)
+
+| Method | Path | Description |
+|---|---|---|
+| GET / POST / DELETE | `pairing` | Manual `(playerId, playerToken)` pairing — `playerToken` accepts either signed or unsigned 32-bit rendering (`RustPlusTokenFormat`) |
+| GET | `team` | Live `GetTeamInfo` round-trip (blocks on the socket — prefer `team-state` below for UI) |
+| GET | `team-state` | DB-backed roster kept fresh by `RustPlusTeamTrackingWorker` (teamChanged broadcast + 30s fallback poll) — includes `lastGrid`, `isOnline`, `isAlive` |
+| GET | `vending-machines` | Live `GetMapMarkers` round-trip, filtered to vending machines |
+| GET | `vending/search?q=&maxCost=&inStockOnly=` | DB-backed search over `VendingMachineSnapshot`/`VendingListing`, populated by `RustPlusVendingPollWorker` (60s poll) — never round-trips to the game server per keystroke |
+| GET / POST / PUT / DELETE | `shop-alerts[/{id}]` | CRUD for `ShopAlert` — matched against `Rustex.Domain.RustPlus.VendingDiff` output by the same poll worker |
+| GET / POST / PUT / DELETE | `devices[/{id}]` | CRUD for `RustPlusSmartDevice` (Switch/Alarm/StorageMonitor) — normally populated automatically by `RustPlusSmartDevicesWorker` from FCM entity-pairing pushes; POST covers manual entry |
+| POST | `devices/{id}/value` | Body `{ value }` — toggles a Smart Switch live. Alarms/Storage Monitors are read-only in Rust+ itself |
+| GET | `chat?limit=50` | Recent team chat, ingested by `RustPlusChatAssistantWorker` from the `teamMessage` broadcast |
+| POST | `chat` | Body `{ message }` — sends into the game's team chat from the dashboard |
+| POST | `auto-pair` | **410 Gone** — superseded by the link-code + `rustex-pair` flow above |
+
+A paired Smart Alarm tripping (`entityChanged.value == true`, or the `AlarmTriggered` FCM push)
+raises a real `RaidEvent` with `Source = RustPlus`, deduped per-server within a 10s window across
+both signal paths — the only raid signal Rust+ can supply without a server plugin.
+
+Team chat supports `!help !pop !time !team !alerts !wipe !pos !device <name>`, rate-limited to
+one reply per 3s and 20/min per pairing.
+
+### Reference data
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/rust-items?q=&limit=20` | Public, no auth — item name/shortname search backing vending search and shop alert autocomplete |
+| GET | `/rust-items/{itemId}` | Single item lookup |
+
+See `docs/RUSTPLUS.md` for the full architecture, confidence levels, and what's still unverified.
+
 ## Health
 
 | Method | Path | Description |
@@ -132,7 +190,7 @@ Connect with `?clientKind=app` (installed/standalone PWA) or omit it (plain brow
 
 - Client → server: `Subscribe(serverId)`, `Unsubscribe(serverId)` — joins/leaves the `server:{id}` group
 - Server → client, per server: `RaidEventCreated`, `ServerStatusUpdated`
-- Server → client, per user: `IncomingRaidCall` (App-kind connections — full-screen ring alert), `RaidAlertNotification` (Desktop-kind connections — plain browser notification)
+- Server → client, per user (auto-joined on connect, no explicit subscribe needed): `IncomingRaidCall` (App-kind connections — full-screen ring alert), `RaidAlertNotification` (Desktop-kind connections — plain browser notification), `NotificationCreated` (fired by `INotificationDispatcher` for any non-emergency notification — Rust+ team status changes, shop alerts, device pairings; `{ id, type, title, body, severity, createdAt }`)
 
 (Payload shapes in `Hubs/SignalRRaidEventBroadcaster.cs`.)
 
