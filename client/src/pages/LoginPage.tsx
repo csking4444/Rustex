@@ -132,8 +132,14 @@ export default function LoginPage() {
           <button onClick={loginWithGoogle} className="btn-ghost w-full justify-center">
             Google
           </button>
-          <button onClick={loginWithSteam} className="btn-ghost w-full justify-center">
+          <button onClick={() => loginWithSteam()} className="btn-ghost w-full justify-center">
             Steam
+          </button>
+          <button
+            onClick={() => loginWithSteam(true)}
+            className="text-xs text-text-muted underline-offset-2 hover:text-white hover:underline"
+          >
+            Use a different Steam account
           </button>
         </div>
 

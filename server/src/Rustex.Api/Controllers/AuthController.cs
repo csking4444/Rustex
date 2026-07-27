@@ -248,15 +248,18 @@ public class AuthController : ControllerBase
     // cookie used by Discord/Google is layered on top as a secondary check when present, but isn't
     // required, since Steam's redirect chain is the primary defence here.
 
+    /// <param name="force">Send the user to Steam's sign-in form even if their browser already has
+    /// a Steam session. Without it Steam auto-approves and bounces straight back — correct SSO, but
+    /// it makes the button look like it did nothing, and gives no way to pick a different account.</param>
     [HttpGet("steam/login")]
-    public async Task<IActionResult> SteamLogin()
+    public async Task<IActionResult> SteamLogin([FromQuery] bool force = false)
     {
         if (!_steam.IsConfigured)
             return BadRequest("Steam login is not enabled on this server.");
 
         var nonce = await _steamState.IssueAsync(SteamAuthPurpose.Login);
         SetStateCookie(nonce);
-        return Redirect(_steam.BuildAuthorizeUrl(_steamOptions.ReturnUrl, _steamOptions.Realm, nonce));
+        return Redirect(_steam.BuildAuthorizeUrl(_steamOptions.ReturnUrl, _steamOptions.Realm, nonce, force));
     }
 
     /// <summary>Attaches Steam to the caller's already-signed-in account. A top-level browser
@@ -264,14 +267,14 @@ public class AuthController : ControllerBase
     /// in the nonce rather than read off the request when Steam redirects back.</summary>
     [HttpPost("steam/link/start")]
     [Authorize]
-    public async Task<ActionResult<SteamLinkStartResponse>> SteamLinkStart()
+    public async Task<ActionResult<SteamLinkStartResponse>> SteamLinkStart([FromQuery] bool force = false)
     {
         if (!_steam.IsConfigured)
             return BadRequest("Steam login is not enabled on this server.");
 
         var nonce = await _steamState.IssueAsync(SteamAuthPurpose.Link, CurrentUserId);
         SetStateCookie(nonce);
-        return new SteamLinkStartResponse(_steam.BuildAuthorizeUrl(_steamOptions.ReturnUrl, _steamOptions.Realm, nonce));
+        return new SteamLinkStartResponse(_steam.BuildAuthorizeUrl(_steamOptions.ReturnUrl, _steamOptions.Realm, nonce, force));
     }
 
     [HttpDelete("steam/link")]

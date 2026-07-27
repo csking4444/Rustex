@@ -8,6 +8,11 @@ namespace Rustex.Infrastructure.Auth;
 public class SteamAuthService : ISteamAuthService
 {
     private const string OpenIdEndpoint = "https://steamcommunity.com/openid/login";
+    private const string OpenIdPath = "/openid/login";
+    // Steam's sign-in form itself. /openid/login auto-approves and redirects straight back when the
+    // browser already has a Steam session (correct SSO behaviour, but it reads as "the button did
+    // nothing"), so forceLogin points at the form and passes the OpenID request along as ?goto=.
+    private const string LoginFormEndpoint = "https://steamcommunity.com/openid/loginform/";
     private const string OpenIdNamespace = "http://specs.openid.net/auth/2.0";
     private const string IdentifierSelect = "http://specs.openid.net/auth/2.0/identifier_select";
     private const string SteamIdentityPrefix = "https://steamcommunity.com/openid/id/";
@@ -37,7 +42,7 @@ public class SteamAuthService : ISteamAuthService
 
     public bool HasProfileApi => !string.IsNullOrWhiteSpace(_options.ApiKey);
 
-    public string BuildAuthorizeUrl(string returnUrl, string realm, string state)
+    public string BuildAuthorizeUrl(string returnUrl, string realm, string state, bool forceLogin = false)
     {
         var returnToWithState = AppendQueryParam(returnUrl, "state", state);
         var query = new Dictionary<string, string>
@@ -51,7 +56,11 @@ public class SteamAuthService : ISteamAuthService
         };
 
         var qs = string.Join("&", query.Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"));
-        return $"{OpenIdEndpoint}?{qs}";
+        if (!forceLogin) return $"{OpenIdEndpoint}?{qs}";
+
+        // goto is a steamcommunity.com-relative path, which is the shape Steam's own redirect chain
+        // uses — the whole OpenID request rides along inside it and resumes after the user signs in.
+        return $"{LoginFormEndpoint}?goto={Uri.EscapeDataString($"{OpenIdPath}?{qs}")}";
     }
 
     public async Task<SteamVerificationResult?> VerifyAsync(IReadOnlyDictionary<string, string> callbackQuery, CancellationToken ct)

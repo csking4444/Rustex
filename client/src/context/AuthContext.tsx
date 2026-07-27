@@ -13,8 +13,8 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   loginWithGoogle: () => void;
-  loginWithSteam: () => void;
-  linkSteam: () => Promise<void>;
+  loginWithSteam: (forceLogin?: boolean) => void;
+  linkSteam: (forceLogin?: boolean) => Promise<void>;
   unlinkSteam: () => Promise<void>;
   registerWithPassword: (email: string, password: string, username: string) => Promise<void>;
   loginWithPassword: (email: string, password: string) => Promise<void>;
@@ -53,15 +53,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = `${import.meta.env.VITE_API_BASE_URL}/auth/google/login`;
   }, []);
 
-  const loginWithSteam = useCallback(() => {
-    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/auth/steam/login`;
+  // forceLogin sends the user to Steam's sign-in form even if their browser already has a Steam
+  // session, which is what "sign in with a different account" needs — Steam OpenID 2.0 otherwise
+  // auto-approves silently and there's no way to choose.
+  const loginWithSteam = useCallback((forceLogin = false) => {
+    const base = `${import.meta.env.VITE_API_BASE_URL}/auth/steam/login`;
+    window.location.href = forceLogin ? `${base}?force=true` : base;
   }, []);
 
   // Linking is a separate action from logging in: the account is already known (you're signed
   // in), so the server pre-encodes that intent server-side and this just follows the redirect it
   // hands back — unlike loginWithSteam, which is a plain navigation.
-  const linkSteam = useCallback(async () => {
-    const { data } = await apiClient.post<{ url: string }>("/auth/steam/link/start");
+  const linkSteam = useCallback(async (forceLogin = false) => {
+    const { data } = await apiClient.post<{ url: string }>("/auth/steam/link/start", null, {
+      params: forceLogin ? { force: true } : undefined,
+    });
     window.location.href = data.url;
   }, []);
 

@@ -14,8 +14,8 @@ Only implemented endpoints are listed. Everything else in the original spec's AP
 | GET | `/auth/discord/callback` | OAuth2 callback; exchanges code, upserts user, issues JWT + refresh token, redirects to frontend with tokens |
 | GET | `/auth/google/login` | Redirects to Google OAuth2 consent screen |
 | GET | `/auth/google/callback` | Callback; upserts user by Google subject, issues tokens |
-| GET | `/auth/steam/login` | Redirects to Steam OpenID; callback creates-or-signs-in by SteamId64 (no auto-link to an existing email/password account — Steam gives no verifiable email) |
-| POST | `/auth/steam/link/start` | `[Authorize]` — returns `{ url }` to link Steam to the *current* signed-in account (intent is pre-encoded into the OpenID nonce, since a top-level redirect can't carry a bearer header) |
+| GET | `/auth/steam/login?force=` | Redirects to Steam OpenID; callback creates-or-signs-in by SteamId64 (no auto-link to an existing email/password account — Steam gives no verifiable email). `force=true` targets Steam's sign-in *form* rather than the auto-approving endpoint, so a user whose browser already holds a Steam session still gets prompted — OpenID 2.0 has no `prompt=login`, so this is the only way to offer "use a different account" |
+| POST | `/auth/steam/link/start?force=` | `[Authorize]` — returns `{ url }` to link Steam to the *current* signed-in account (intent is pre-encoded into the OpenID nonce, since a top-level redirect can't carry a bearer header). `force=true` matters more here than on login: a stale Steam session would otherwise silently link the wrong Steam account |
 | DELETE | `/auth/steam/link` | `[Authorize]` — unlink; refused if it's the account's only credential |
 | GET | `/auth/steam/callback` | Shared callback for both login and link, branching on the nonce's `Purpose`. Replay-guarded (`TrySetIfAbsentAsync` on the nonce), validates `openid.signed` includes `op_endpoint,return_to,claimed_id,identity,response_nonce,assoc_handle`, `return_to` matches config, and the nonce timestamp is within ±5 min |
 | POST | `/auth/refresh` | Body: `{ refreshToken }` → new access + refresh token pair (rotates the refresh token) |

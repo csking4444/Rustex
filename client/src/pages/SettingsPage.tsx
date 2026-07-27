@@ -132,9 +132,17 @@ export default function SettingsPage() {
                   {unlinkingSteam ? "Unlinking..." : "Unlink"}
                 </button>
               ) : (
-                <button onClick={() => void linkSteam()} className="btn-secondary">
-                  Link Steam
-                </button>
+                <div className="flex flex-col items-end gap-1">
+                  <button onClick={() => void linkSteam()} className="btn-secondary">
+                    Link Steam
+                  </button>
+                  <button
+                    onClick={() => void linkSteam(true)}
+                    className="text-xs text-text-muted underline-offset-2 hover:text-white hover:underline"
+                  >
+                    Pick a different account
+                  </button>
+                </div>
               )}
             </div>
             {steamActionError && <p className="mt-2 text-xs text-warning">{steamActionError}</p>}

@@ -199,6 +199,34 @@ public class SteamAuthServiceTests
         Assert.Contains(Uri.EscapeDataString($"{ReturnUrl}?state={Uri.EscapeDataString("abc def")}"), url);
     }
 
+    [Fact]
+    public void BuildAuthorizeUrl_WithoutForceLogin_TargetsAutoApprovingEndpoint()
+    {
+        var service = CreateService(ValidCheckAuthResponse());
+
+        var url = service.BuildAuthorizeUrl(ReturnUrl, Realm, "nonce");
+
+        Assert.StartsWith("https://steamcommunity.com/openid/login?", url);
+        Assert.DoesNotContain("loginform", url);
+    }
+
+    [Fact]
+    public void BuildAuthorizeUrl_WithForceLogin_TargetsSignInFormAndCarriesRequestInGoto()
+    {
+        var service = CreateService(ValidCheckAuthResponse());
+
+        var url = service.BuildAuthorizeUrl(ReturnUrl, Realm, "nonce", forceLogin: true);
+
+        Assert.StartsWith("https://steamcommunity.com/openid/loginform/?goto=", url);
+
+        // goto is a steamcommunity-relative path, so the whole OpenID request has to survive one
+        // extra layer of escaping and still resume correctly after the user signs in.
+        var goto_ = Uri.UnescapeDataString(url["https://steamcommunity.com/openid/loginform/?goto=".Length..]);
+        Assert.StartsWith("/openid/login?", goto_);
+        Assert.Contains("openid.mode=checkid_setup", goto_);
+        Assert.Contains(Uri.EscapeDataString($"{ReturnUrl}?state=nonce"), goto_);
+    }
+
     private sealed class StubHttpMessageHandler(HttpResponseMessage response) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>

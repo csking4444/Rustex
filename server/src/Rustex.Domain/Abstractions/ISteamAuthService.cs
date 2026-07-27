@@ -21,8 +21,11 @@ public interface ISteamAuthService
 
     /// <summary>Builds the URL to redirect the browser to. <paramref name="state"/> is a
     /// single-use nonce from <see cref="Rustex.Infrastructure.Auth.ISteamOpenIdStateStore"/>,
-    /// embedded in the returned `return_to` so it round-trips inside Steam's signed assertion.</summary>
-    string BuildAuthorizeUrl(string returnUrl, string realm, string state);
+    /// embedded in the returned `return_to` so it round-trips inside Steam's signed assertion.
+    /// <paramref name="forceLogin"/> targets Steam's sign-in form instead of the auto-approving
+    /// OpenID endpoint, so a user with an existing Steam session still gets prompted — needed for
+    /// "sign in as someone else", since OpenID 2.0 has no `prompt=login` equivalent.</summary>
+    string BuildAuthorizeUrl(string returnUrl, string realm, string state, bool forceLogin = false);
 
     /// <summary>Verifies a Steam OpenID 2.0 callback in full: re-posts the assertion to Steam for
     /// `check_authentication`, and additionally validates `op_endpoint`, that `openid.signed`
