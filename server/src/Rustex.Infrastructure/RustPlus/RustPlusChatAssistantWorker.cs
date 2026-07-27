@@ -73,6 +73,12 @@ public sealed class RustPlusChatAssistantWorker : BackgroundService
         var pairing = await db.RustPlusPairings.Include(p => p.Server).FirstOrDefaultAsync(p => p.Id == pairingId, ct);
         if (pairing is null) return;
 
+        // Messages from our own paired identity (auto-replies, or ones sent via the web
+        // dashboard's send-chat endpoint) are recorded at send time by whoever sent them — skip
+        // here rather than risk a duplicate row if Rust+ also echoes the sender's own message
+        // back through this same broadcast.
+        if (message.SteamId == pairing.PlayerId) return;
+
         db.RustPlusChatMessages.Add(new RustPlusChatMessage
         {
             ServerId = pairing.ServerId,

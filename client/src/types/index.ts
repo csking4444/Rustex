@@ -200,3 +200,100 @@ export interface AnalyticsSummary {
   avgPlayerCount: number | null;
   peakPlayerCount: number | null;
 }
+
+// ---------- Rust+ ----------
+
+export interface RustPlusCredentialStatus {
+  hasCredentials: boolean;
+  status: "Active" | "NeedsReauth" | "Disabled" | null;
+  registeredAt: string | null;
+  expiresAt: string | null;
+  lastNotificationAt: string | null;
+  steamId: string | null;
+}
+
+export interface RustPlusLinkCode {
+  code: string;
+  expiresAt: string;
+}
+
+export interface RustPlusPairing {
+  id: string;
+  serverId: string;
+  playerId: string;
+  serverIp: string;
+  serverPort: number;
+  createdAt: string;
+  lastConnectedAt: string | null;
+}
+
+export interface RustPlusTeamMemberState {
+  steamId: string;
+  name: string;
+  isOnline: boolean;
+  isAlive: boolean;
+  lastX: number;
+  lastY: number;
+  lastGrid: string | null;
+  lastSeenAt: string;
+  updatedAt: string;
+}
+
+export interface RustPlusVendingSearchResult {
+  markerId: number;
+  machineName: string | null;
+  grid: string | null;
+  itemId: number;
+  itemName: string;
+  costPerItem: number;
+  currencyId: number;
+  currencyName: string;
+  currencyIsBlueprint: boolean;
+  amountInStock: number;
+  updatedAt: string;
+}
+
+export interface ShopAlert {
+  id: string;
+  serverId: string;
+  itemId: number | null;
+  itemName: string | null;
+  itemNameContains: string | null;
+  maxCostPerItem: number | null;
+  minAmountInStock: number;
+  notifyOnNewListing: boolean;
+  notifyOnPriceDrop: boolean;
+  notifyOnRestock: boolean;
+  isEnabled: boolean;
+  cooldownSeconds: number;
+  lastTriggeredAt: string | null;
+  createdAt: string;
+}
+
+export type SmartDeviceKind = "Switch" | "Alarm" | "StorageMonitor";
+
+export interface RustPlusSmartDevice {
+  id: string;
+  entityId: number;
+  type: SmartDeviceKind;
+  name: string;
+  lastKnownValue: boolean | null;
+  lastKnownCapacity: number | null;
+  alarmRaisesRaidEvent: boolean;
+  lastChangedAt: string | null;
+  pairedAt: string;
+}
+
+export interface RustItem {
+  id: number;
+  shortname: string;
+  name: string;
+}
+
+export interface RustPlusChatMessage {
+  steamId: string;
+  name: string;
+  message: string;
+  isFromAssistant: boolean;
+  sentAt: string;
+}

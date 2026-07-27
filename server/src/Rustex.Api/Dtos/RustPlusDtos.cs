@@ -83,6 +83,10 @@ public record UpdateSmartDeviceRequest(string Name, bool AlarmRaisesRaidEvent);
 
 public record SetSmartDeviceValueRequest(bool Value);
 
+public record RustPlusChatMessageResponse(ulong SteamId, string Name, string Message, bool IsFromAssistant, DateTimeOffset SentAt);
+
+public record SendRustPlusChatMessageRequest(string Message);
+
 public record ShopAlertResponse(
     Guid Id,
     Guid ServerId,

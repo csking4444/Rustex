@@ -207,6 +207,60 @@ public class RustPlusController : ControllerBase
         return results.OrderBy(r => r.CostPerItem).Take(200).ToList();
     }
 
+    /// <summary>Recent team chat, ingested by RustPlusChatAssistantWorker from the teamMessage
+    /// broadcast — includes the assistant's own replies (IsFromAssistant) so the web UI can show
+    /// one unified feed.</summary>
+    [HttpGet("chat")]
+    public async Task<ActionResult<List<RustPlusChatMessageResponse>>> GetChat(Guid serverId, [FromQuery] int limit = 50, CancellationToken ct = default)
+    {
+        var hasPairing = await _db.RustPlusPairings.AnyAsync(p => p.ServerId == serverId && p.UserId == CurrentUserId, ct);
+        if (!hasPairing) return NotFound("No Rust+ pairing saved for this server yet.");
+
+        var messages = await _db.RustPlusChatMessages
+            .Where(m => m.ServerId == serverId)
+            .OrderByDescending(m => m.SentAt)
+            .Take(Math.Clamp(limit, 1, 200))
+            .Select(m => new RustPlusChatMessageResponse(m.SteamId, m.Name, m.Message, m.IsFromAssistant, m.SentAt))
+            .ToListAsync(ct);
+        messages.Reverse();
+        return messages;
+    }
+
+    /// <summary>Sends a message into the game's team chat from the web dashboard, using the same
+    /// live connection Team Tracking/Chat Assistant already keep warm.</summary>
+    [HttpPost("chat")]
+    public async Task<IActionResult> SendChat(Guid serverId, [FromBody] SendRustPlusChatMessageRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Message)) return BadRequest("Message can't be empty.");
+
+        var clientResult = await ConnectAsync(serverId, ct);
+        if (clientResult.Error is not null) return clientResult.Error;
+
+        try
+        {
+            await clientResult.Client!.SendTeamMessageAsync(request.Message, ct);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(502, $"Rust+ request failed: {ex.Message}");
+        }
+
+        // RustPlusChatAssistantWorker's broadcast handler skips messages from our own paired
+        // identity (to avoid double-recording its own auto-replies), so this endpoint has to
+        // record the message it just sent itself.
+        var pairing = await _db.RustPlusPairings.FirstOrDefaultAsync(p => p.ServerId == serverId && p.UserId == CurrentUserId, ct);
+        _db.RustPlusChatMessages.Add(new RustPlusChatMessage
+        {
+            ServerId = serverId,
+            SteamId = pairing?.PlayerId ?? 0,
+            Name = "Rustex",
+            Message = request.Message,
+            IsFromAssistant = true,
+        });
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
     private async Task<(RustPlusClient? Client, ActionResult? Error)> ConnectAsync(Guid serverId, CancellationToken ct)
     {
         if (_encryption is null)

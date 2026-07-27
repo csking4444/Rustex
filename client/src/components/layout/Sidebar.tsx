@@ -9,6 +9,7 @@ import {
   BarChart3,
   Settings,
   ChevronsLeft,
+  Radio,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { RustexMark } from "@/components/brand/RustexMark";
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { to: "/servers", label: "Servers", icon: Server },
   { to: "/maps", label: "Maps", icon: Map },
   { to: "/raid-alerts", label: "Raid Alerts", icon: Siren },
+  { to: "/rust-plus", label: "Rust+", icon: Radio },
   { to: "/events", label: "Events", icon: CalendarClock },
   { to: "/teams", label: "Teams", icon: Users },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },

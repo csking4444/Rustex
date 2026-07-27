@@ -8,6 +8,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import ServersPage from "@/pages/ServersPage";
 import MapsPage from "@/pages/MapsPage";
 import RaidAlertsPage from "@/pages/RaidAlertsPage";
+import RustPlusPage from "@/pages/RustPlusPage";
 import EventsPage from "@/pages/EventsPage";
 import TeamsPage from "@/pages/TeamsPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/servers" element={<ServersPage />} />
           <Route path="/maps" element={<MapsPage />} />
           <Route path="/raid-alerts" element={<RaidAlertsPage />} />
+          <Route path="/rust-plus" element={<RustPlusPage />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />

@@ -176,7 +176,12 @@ builder.Services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
 // ---------- API ----------
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
-        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
+    {
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        // Steam64 ids overflow JS's safe integer range — see UlongStringConverter's doc comment.
+        options.JsonSerializerOptions.Converters.Add(new Rustex.Api.Serialization.UlongStringConverter());
+        options.JsonSerializerOptions.Converters.Add(new Rustex.Api.Serialization.NullableUlongStringConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
