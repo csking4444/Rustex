@@ -1,6 +1,8 @@
 namespace Rustex.Api.Dtos;
 
-public record CreateRustPlusPairingRequest(ulong PlayerId, string PlayerToken, string ServerIp, int ServerPort);
+/// <summary>PlayerToken accepts either the signed or unsigned 32-bit rendering of a Rust+ token
+/// — different community pairing tools print it differently — see RustPlusTokenFormat.</summary>
+public record CreateRustPlusPairingRequest(ulong PlayerId, long PlayerToken, string ServerIp, int ServerPort);
 
 public record RustPlusPairingResponse(
     Guid Id,

@@ -8,9 +8,8 @@ namespace Rustex.Infrastructure.RustPlus;
 
 /// <summary>
 /// A live connection to one paired Rust server's Rust+ WebSocket endpoint. Requires an already
-/// obtained (playerId, playerToken) pair from pairing — see docs/ARCHITECTURE.md for how that
-/// pairing normally happens (Stage B: FCM push notifications) versus the manual-entry path this
-/// client works with regardless of how the token was obtained.
+/// obtained (playerId, playerToken) pair — see docs/RUSTPLUS.md for how pairing happens (manual
+/// entry, or the `rustex-pair` one-time setup once that exists).
 ///
 /// Wire format: each WebSocket binary frame is exactly one serialized AppRequest (outbound) or
 /// AppMessage (inbound) protobuf message — no additional framing. Requests are correlated to
@@ -18,20 +17,37 @@ namespace Rustex.Infrastructure.RustPlus;
 /// </summary>
 public sealed class RustPlusClient : IAsyncDisposable
 {
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(60);
+    private const int HeartbeatFailuresBeforeFaulted = 2;
+
     private readonly ClientWebSocket _socket = new();
     private readonly ulong _playerId;
-    private readonly uint _playerToken;
+    private readonly int _playerToken;
     private readonly ILogger _logger;
     private readonly ConcurrentDictionary<uint, TaskCompletionSource<AppResponse>> _pending = new();
     private readonly CancellationTokenSource _lifetimeCts = new();
+    // ClientWebSocket.SendAsync throws if two calls overlap, and this client is shared across
+    // concurrent HTTP requests via RustPlusConnectionManager — without this lock, two callers
+    // hitting the same pairing at once throw "There is already one outstanding SendAsync call".
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
     private int _nextSeq;
     private Task? _receiveLoop;
+    private Task? _heartbeatLoop;
+    private volatile bool _faulted;
 
     /// <summary>Raised for server-pushed events the client didn't explicitly request — e.g. a
     /// team member's status changing, or a new team chat message.</summary>
     public event Action<AppBroadcast>? OnBroadcast;
 
-    public RustPlusClient(ulong playerId, uint playerToken, ILogger logger)
+    /// <summary>Raised once, when the connection ends for any reason (clean close, network
+    /// failure, heartbeat timeout). The owner (RustPlusSession) uses this to trigger a
+    /// reconnect — this client itself never reconnects.</summary>
+    public event Action<Exception?>? OnClosed;
+
+    public bool IsHealthy => _socket.State == WebSocketState.Open && !_faulted;
+
+    public RustPlusClient(ulong playerId, int playerToken, ILogger logger)
     {
         _playerId = playerId;
         _playerToken = playerToken;
@@ -40,9 +56,16 @@ public sealed class RustPlusClient : IAsyncDisposable
 
     public async Task ConnectAsync(string host, int port, CancellationToken ct)
     {
+        _socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
+
+        using var connectTimeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        connectTimeoutCts.CancelAfter(TimeSpan.FromSeconds(15));
+
         var uri = new Uri($"ws://{host}:{port}");
-        await _socket.ConnectAsync(uri, ct);
+        await _socket.ConnectAsync(uri, connectTimeoutCts.Token);
+
         _receiveLoop = Task.Run(() => ReceiveLoopAsync(_lifetimeCts.Token), CancellationToken.None);
+        _heartbeatLoop = Task.Run(() => HeartbeatLoopAsync(_lifetimeCts.Token), CancellationToken.None);
     }
 
     public async Task<AppInfo> GetInfoAsync(CancellationToken ct)
@@ -79,12 +102,20 @@ public sealed class RustPlusClient : IAsyncDisposable
         await SendAsync(new AppRequest { SendTeamMessage = new AppSendMessage { Message = message } }, ct);
     }
 
+    /// <summary>Subscribes this connection to server-pushed broadcasts (team changes, chat,
+    /// entity changes). Rust+ does not enable these by default — call this once per connection,
+    /// which is why RustPlusSession sends it right after every (re)connect.</summary>
+    public async Task SetSubscriptionAsync(bool value, CancellationToken ct)
+    {
+        await SendAsync(new AppRequest { SetSubscription = new AppFlag { Value = value } }, ct);
+    }
+
     private static Exception ErrorOrUnexpected(AppResponse response) =>
         new InvalidOperationException(response.Error?.Error ?? "Rust+ server returned an unexpected empty response.");
 
     private async Task<AppResponse> SendAsync(AppRequest request, CancellationToken ct)
     {
-        if (_socket.State != WebSocketState.Open)
+        if (!IsHealthy)
             throw new InvalidOperationException("Not connected to a Rust+ server.");
 
         var seq = (uint)Interlocked.Increment(ref _nextSeq);
@@ -98,10 +129,19 @@ public sealed class RustPlusClient : IAsyncDisposable
         try
         {
             var bytes = request.ToByteArray();
-            await _socket.SendAsync(bytes, WebSocketMessageType.Binary, true, ct);
+
+            await _sendLock.WaitAsync(ct);
+            try
+            {
+                await _socket.SendAsync(bytes, WebSocketMessageType.Binary, true, ct);
+            }
+            finally
+            {
+                _sendLock.Release();
+            }
 
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetimeCts.Token);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(10));
+            timeoutCts.CancelAfter(RequestTimeout);
             await using (timeoutCts.Token.Register(() => tcs.TrySetCanceled(timeoutCts.Token)))
             {
                 return await tcs.Task;
@@ -113,9 +153,48 @@ public sealed class RustPlusClient : IAsyncDisposable
         }
     }
 
+    private async Task HeartbeatLoopAsync(CancellationToken ct)
+    {
+        // WebSocket-level ping/pong (KeepAliveInterval above) doesn't reliably keep a Rust+
+        // socket alive on its own — this issues a cheap real request instead. Two consecutive
+        // failures mark the client faulted so SendAsync fails fast rather than callers hanging
+        // on a socket that looks Open but is actually dead.
+        var consecutiveFailures = 0;
+
+        try
+        {
+            using var timer = new PeriodicTimer(HeartbeatInterval);
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                if (_faulted) return;
+
+                try
+                {
+                    await SendAsync(new AppRequest { GetTime = new AppEmpty() }, ct);
+                    consecutiveFailures = 0;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    consecutiveFailures++;
+                    _logger.LogWarning(ex, "Rust+ heartbeat failed ({Count}/{Max})", consecutiveFailures, HeartbeatFailuresBeforeFaulted);
+                    if (consecutiveFailures >= HeartbeatFailuresBeforeFaulted)
+                    {
+                        FaultAndClose(ex);
+                        return;
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // shutting down
+        }
+    }
+
     private async Task ReceiveLoopAsync(CancellationToken ct)
     {
         var buffer = new byte[65536];
+        Exception? closeReason = null;
 
         try
         {
@@ -155,8 +234,30 @@ public sealed class RustPlusClient : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            closeReason = ex;
             _logger.LogWarning(ex, "Rust+ WebSocket receive loop ended unexpectedly");
         }
+        finally
+        {
+            FaultAndClose(closeReason);
+        }
+    }
+
+    /// <summary>Marks the client dead and fails every in-flight request immediately, instead of
+    /// letting each one hang until its own 10-second timeout. Idempotent — safe to call from
+    /// both the receive loop and the heartbeat loop racing each other.</summary>
+    private void FaultAndClose(Exception? reason)
+    {
+        if (_faulted) return;
+        _faulted = true;
+
+        foreach (var (seq, tcs) in _pending)
+        {
+            tcs.TrySetException(reason ?? new IOException("Rust+ connection closed."));
+            _pending.TryRemove(seq, out _);
+        }
+
+        OnClosed?.Invoke(reason);
     }
 
     public async ValueTask DisposeAsync()
@@ -179,8 +280,13 @@ public sealed class RustPlusClient : IAsyncDisposable
         {
             try { await _receiveLoop; } catch { /* already logged inside the loop */ }
         }
+        if (_heartbeatLoop is not null)
+        {
+            try { await _heartbeatLoop; } catch { /* already logged inside the loop */ }
+        }
 
         _socket.Dispose();
         _lifetimeCts.Dispose();
+        _sendLock.Dispose();
     }
 }

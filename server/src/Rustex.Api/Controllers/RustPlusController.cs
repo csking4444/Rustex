@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Rustex.Api.Dtos;
 using Rustex.Domain.Entities;
+using Rustex.Domain.RustPlus;
 using Rustex.Infrastructure.Persistence;
 using Rustex.Infrastructure.RustPlus;
+using Rustex.Infrastructure.RustPlus.Proto;
 using Rustex.Infrastructure.Security;
 
 namespace Rustex.Api.Controllers;
@@ -21,8 +23,6 @@ namespace Rustex.Api.Controllers;
 [Authorize]
 public class RustPlusController : ControllerBase
 {
-    private const int VendingMachineMarkerType = 3;
-
     private readonly AppDbContext _db;
     private readonly RustPlusConnectionManager _connectionManager;
     private readonly IEncryptionService? _encryption;
@@ -53,6 +53,9 @@ public class RustPlusController : ControllerBase
         if (_encryption is null)
             return StatusCode(503, "This server has no Encryption:FieldKey configured, so Rust+ tokens can't be stored securely.");
 
+        if (!RustPlusTokenFormat.TryNormalize(request.PlayerToken, out var signedToken))
+            return BadRequest("playerToken must fit in 32 bits — check you copied the whole value from your pairing tool.");
+
         var ownsServer = await _db.RustServers.AnyAsync(s => s.Id == serverId && s.OwnerUserId == CurrentUserId, ct);
         if (!ownsServer) return NotFound();
 
@@ -70,7 +73,7 @@ public class RustPlusController : ControllerBase
         }
 
         pairing.PlayerId = request.PlayerId;
-        pairing.PlayerTokenEncrypted = _encryption.Encrypt(request.PlayerToken);
+        pairing.PlayerTokenEncrypted = _encryption.Encrypt(signedToken.ToString());
         pairing.ServerIp = request.ServerIp;
         pairing.ServerPort = request.ServerPort;
 
@@ -131,9 +134,9 @@ public class RustPlusController : ControllerBase
         {
             var markers = await clientResult.Client!.GetMapMarkersAsync(ct);
             var vendingMachines = markers
-                .Where(m => m.Type == VendingMachineMarkerType)
+                .Where(m => m.Type == AppMarkerType.VendingMachine)
                 .Select(m => new RustPlusVendingMachineResponse(
-                    m.Id, m.X, m.Y,
+                    (int)m.Id, m.X, m.Y,
                     m.SellOrders.Select(o => new RustPlusSellOrderResponse(o.ItemId, o.Quantity, o.CurrencyId, o.CostPerItem, o.AmountInStock)).ToList()))
                 .ToList();
             return vendingMachines;
@@ -153,9 +156,11 @@ public class RustPlusController : ControllerBase
         if (pairing is null)
             return (null, NotFound("No Rust+ pairing saved for this server yet."));
 
+        if (!int.TryParse(_encryption.Decrypt(pairing.PlayerTokenEncrypted), out var token))
+            return (null, Conflict("The saved Rust+ token for this pairing is malformed — delete and re-pair this server."));
+
         try
         {
-            var token = uint.Parse(_encryption.Decrypt(pairing.PlayerTokenEncrypted));
             var client = await _connectionManager.GetOrConnectAsync(pairing, token, ct);
 
             pairing.LastConnectedAt = DateTimeOffset.UtcNow;
