@@ -21,6 +21,8 @@ public class AppDbContext : DbContext
     public DbSet<RustServer> RustServers => Set<RustServer>();
     public DbSet<ServerStatusSnapshot> ServerStatusSnapshots => Set<ServerStatusSnapshot>();
     public DbSet<RustPlusPairing> RustPlusPairings => Set<RustPlusPairing>();
+    public DbSet<RustPlusLinkCode> RustPlusLinkCodes => Set<RustPlusLinkCode>();
+    public DbSet<RustPlusAccountCredential> RustPlusAccountCredentials => Set<RustPlusAccountCredential>();
 
     public DbSet<RaidEvent> RaidEvents => Set<RaidEvent>();
     public DbSet<RaidAlarmSettings> RaidAlarmSettings => Set<RaidAlarmSettings>();
@@ -121,6 +123,19 @@ public class AppDbContext : DbContext
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Server).WithMany().HasForeignKey(x => x.ServerId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => new { x.UserId, x.ServerId }).IsUnique();
+        });
+
+        b.Entity<RustPlusLinkCode>(e =>
+        {
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.CodeHash).IsUnique();
+        });
+
+        b.Entity<RustPlusAccountCredential>(e =>
+        {
+            e.HasKey(x => x.UserId);
+            e.HasOne(x => x.User).WithOne().HasForeignKey<RustPlusAccountCredential>(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.Status).HasConversion<string>();
         });
 
         // ---------- Raid events ----------

@@ -13,6 +13,12 @@ public interface IJwtTokenService
     string CreateAccessToken(User user);
     (string token, string tokenHash) CreateRefreshToken();
     string HashRefreshToken(string rawToken);
+
+    /// <summary>A narrowly-scoped, short-lived token for a single purpose — used by the
+    /// rustex-pair link-code flow so a redeemed setup code can call PUT credentials without
+    /// granting anything close to a full session (it has its own audience/scheme, and the
+    /// "scope" claim is checked by an authorization policy, not just presence of a valid token).</summary>
+    string CreateScopedToken(Guid userId, string audience, string scope, TimeSpan ttl);
 }
 
 public class JwtTokenService : IJwtTokenService
@@ -40,6 +46,28 @@ public class JwtTokenService : IJwtTokenService
             audience: _options.Audience,
             claims: claims,
             expires: DateTime.UtcNow.AddMinutes(_options.AccessTokenMinutes),
+            signingCredentials: creds);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public string CreateScopedToken(Guid userId, string audience, string scope, TimeSpan ttl)
+    {
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new("scope", scope),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+        };
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: _options.Issuer,
+            audience: audience,
+            claims: claims,
+            expires: DateTime.UtcNow.Add(ttl),
             signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);

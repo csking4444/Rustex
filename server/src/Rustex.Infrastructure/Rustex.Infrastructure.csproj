@@ -21,6 +21,11 @@
     <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="8.0.8" />
     <PackageReference Include="Google.Protobuf" Version="3.28.2" />
     <PackageReference Include="Grpc.Tools" Version="2.66.0" PrivateAssets="All" />
+    <!-- Pinned exactly, not floating: this is the only line in the 2.0.0-beta.x series that
+         ships a netstandard2.0 build consumable from net8.0 (the 1.x stable line is net10.0-only).
+         Verified to restore, build, and run cleanly against net8.0 before pinning - see
+         docs/RUSTPLUS.md. Re-verify before bumping. -->
+    <PackageReference Include="RustPlusApi.Fcm.Registration" Version="[2.0.0-beta.6]" />
   </ItemGroup>
 
   <ItemGroup>

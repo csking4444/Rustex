@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Rustex.PairingHelper</RootNamespace>
+    <AssemblyName>rustex-pair</AssemblyName>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>rustex-pair</ToolCommandName>
+    <PackageId>Rustex.PairingHelper</PackageId>
+    <Version>0.1.0</Version>
+    <Description>One-time local setup for Rustex's Rust+ auto-pairing. Steam login happens in your own browser via a real Chrome instance; nothing typed here reaches Rustex except the resulting push credentials.</Description>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Pinned exactly — see the matching comment in Rustex.Infrastructure.csproj. Not
+         referenced by the API itself; this tool runs standalone on the user's own machine. -->
+    <PackageReference Include="RustPlusApi.Fcm.Registration" Version="[2.0.0-beta.6]" />
+  </ItemGroup>
+
+</Project>

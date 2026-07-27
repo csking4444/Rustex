@@ -16,6 +16,11 @@ public class RustServer
     public long? Seed { get; set; }
     public int? WorldSize { get; set; }
     public string? Description { get; set; }
+
+    /// <summary>Facepunch's own server GUID, learned from an FCM "Pair With Server" push. Lets a
+    /// later Smart Alarm/entity push (which only carries this GUID, not our RustServer.Id) be
+    /// attributed back to the right server. Null for servers added via manual pairing only.</summary>
+    public Guid? FacepunchServerId { get; set; }
     public ServerStatus Status { get; set; } = ServerStatus.Unknown;
     public List<string> Tags { get; set; } = new();
     public bool IsFavorite { get; set; }

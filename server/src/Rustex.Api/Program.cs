@@ -3,6 +3,7 @@ using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Rustex.Api.Auth;
 using Rustex.Api.Data;
 using Rustex.Api.HealthChecks;
 using Rustex.Api.Hubs;
@@ -96,9 +97,31 @@ builder.Services.AddAuthentication(options =>
                 return Task.CompletedTask;
             },
         };
+    })
+    // A second, narrower scheme for the rustex-pair link-code flow — a redeemed setup code gets a
+    // token on THIS scheme only, so it's rejected outright by every endpoint using the default
+    // scheme above (a completely separate audience, not just a claim check).
+    .AddJwtBearer(RustPlusPairingAuthConstants.SchemeName, options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidateAudience = true,
+            ValidAudience = RustPlusPairingAuthConstants.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSigningKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+        };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(RustPlusPairingAuthConstants.CredentialWritePolicy, policy => policy
+        .AddAuthenticationSchemes(RustPlusPairingAuthConstants.SchemeName)
+        .RequireClaim("scope", RustPlusPairingAuthConstants.CredentialWriteScope));
+});
 
 // ---------- CORS ----------
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
@@ -131,6 +154,7 @@ builder.Services.AddSingleton<RustPlusConnectionManager>();
 builder.Services.AddHostedService<RustPlusSessionWarmupWorker>();
 builder.Services.AddSingleton<IRustItemCatalog>(_ =>
     new RustItemCatalog(Path.Combine(AppContext.BaseDirectory, "Data", "rust-items.json")));
+builder.Services.AddScoped<IRustPlusCredentialStore, RustPlusCredentialStore>();
 // The FCM auto-pairing listener (Phase 5, gated on RustPlus:EnableFcmListener) registers itself
 // here once it exists. The old hand-rolled checkin/MCS stack was deleted — it was documented as
 // unverified and known-wrong (it sent a raw FCM token where Facepunch expects an Expo token).
