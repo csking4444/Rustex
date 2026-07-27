@@ -90,15 +90,62 @@ constraint discovered while planning this: Facepunch's Rust+ login hands its tok
 redirect. **A plain website cannot capture it.** This is also why the closest competitor
 (Rust On Top) ships as a Windows desktop app rather than a website.
 
-The new design (not yet built — see the plan): a one-time local helper tool
-(`rustex-pair`, using the maintained `RustPlusApi.Fcm.Registration` NuGet package, which drives a
-real local Chrome via DevTools to intercept the token) runs once on the user's own machine — their
-Steam password never touches the Rustex server. The resulting credentials upload to Rustex, which
-then runs a persistent FCM listener server-side (`RustPlusApi.Fcm`) so that pressing "Pair With
-Server" from the in-game Rust+ pause-menu tab registers the server automatically from then on.
+**Built and verified against the real package** (reflection + its XML docs, not secondhand
+claims — see `RustPlusApi.Fcm.Registration` v2.0.0-beta.6, pinned exactly since the 1.x stable
+line targets net10.0 only): `tools/Rustex.PairingHelper` (`rustex-pair`) runs once on the user's
+own machine, drives a real local Chrome via DevTools to capture the Steam login token — their
+Steam password never touches the Rustex server — then uploads the resulting push credentials
+(GCM identity + FCM/Expo tokens, never a password or session token) to Rustex.
+
+Getting a token onto the helper without a plaintext credential in shell history: the signed-in
+user generates a one-time code in the web UI (`POST /api/rustplus/link-codes`), types it into
+`rustex-pair`, which redeems it (`POST link-codes/redeem`) for a 30-minute JWT on its own
+audience/scheme — one that can authorize `PUT credentials` and *nothing else*, not even reading
+the credentials back. Redemption raises an in-app notification so a leaked code doesn't silently
+succeed unnoticed.
 
 `POST /api/servers/{id}/rustplus/auto-pair` (the old per-request, Steam-auth-ticket, two-minute-
 blocking version of this) now returns `410 Gone` pointing at the new setup.
+
+## 5. The server-side listener
+
+`RustPlusFcmListenerWorker` (a `BackgroundService`, gated on `RustPlus:EnableFcmListener`, off by
+default) reconciles every 60s: one `RustPlusFcm` connection per user with `Active` credentials,
+via a thin `IRustPlusFcmClient` wrapper (`RustPlusFcmClientAdapter`) that exists purely so the
+worker can be pointed at a fake in tests instead of a live connection.
+
+Events never touch `AppDbContext` from the socket thread that raises them — every handler goes
+through a per-user `Channel<>`, drained by one consumer that opens its own DI scope per item.
+`RustServerPairingHandler` (pulled out as its own class specifically so it's unit-testable against
+an in-memory database — 6 tests, all passing) turns an `OnServerPairing` push into a created-or-
+reused `RustServer` + upserted `RustPlusPairing`, exactly the same entities manual pairing writes
+to. **Caveat inherited from the vendor package's own docs:** the pairing push's `Port` is the
+Rust+ *companion* port, not the game port — there's no reliable way to derive the real game port
+from it, so a newly auto-created server gets tagged `needs-review` rather than silently querying
+the wrong port.
+
+The other four event types (`EntityPairing`, `SmartSwitchPairing`, `SmartAlarmPairing`,
+`StorageMonitorPairing`, `AlarmTriggered`) are republished through `RustPlusFcmEventBus` rather
+than handled here — Smart Devices (Phase 6) subscribes to that bus once the entity to store them
+in exists, without needing to modify this worker.
+
+**Multi-instance safety:** before starting a user's session, the worker takes a Redis lock
+(`TrySetIfAbsentAsync`, 90s TTL, renewed every 30s) — without it, two API replicas would both
+listen and double-handle every push. This is the one piece of the whole subsystem that isn't
+horizontally scalable by default; fine for a single-instance deployment, worth knowing about
+before scaling out.
+
+**Credential expiry (~14 days, a Steam/Facepunch limit, not a Rustex one):** there's no server-
+side refresh — renewal needs the Chrome+Steam interaction, which by design only happens on the
+user's own machine. The worker warns via notification 2 days out, then flips `Status` to
+`NeedsReauth` and stops the session at expiry. This only affects *future* pairing/alarm pushes —
+servers already paired keep working indefinitely regardless.
+
+**What's genuinely unverified and can't be fixed by more code review:** whether Facepunch's Chrome-
+based login flow still works today, whether the FCM/Expo/GCM endpoints behave the way the vendor
+package assumes, and whether a live push actually arrives end-to-end. All of that needs one real
+run against a live Steam account and Rust server to confirm — see the manual test procedure in
+the plan document.
 
 ## Where things are in the code
 
@@ -108,5 +155,6 @@ blocking version of this) now returns `410 Gone` pointing at the new setup.
 - `server/src/Rustex.Infrastructure/RustPlus/RustPlusSessionWarmupWorker.cs` — startup/periodic warmup
 - `server/src/Rustex.Domain/RustPlus/RustPlusTokenFormat.cs` — signed/unsigned token normalization
 - `server/tests/Rustex.Api.Tests/RustPlus/ProtoFixtureTests.cs` — the golden-byte verification
-- `server/src/Rustex.Infrastructure/RustPlus/Fcm/` — currently just `RustPlusOptions.cs`; the
-  local-helper tool and server-side listener land here next
+- `server/src/Rustex.Api/Controllers/RustPlusAccountController.cs` + `RustPlusAccount.cs` entities — link-code/credential flow
+- `server/src/Rustex.Infrastructure/RustPlus/Fcm/RustPlusFcmListenerWorker.cs` + `RustPlusFcmEventBus.cs` + `RustServerPairingHandler.cs` — the persistent listener
+- `tools/Rustex.PairingHelper/` — the `rustex-pair` local helper (`dotnet tool` / standalone build)

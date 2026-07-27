@@ -155,6 +155,8 @@ builder.Services.AddHostedService<RustPlusSessionWarmupWorker>();
 builder.Services.AddSingleton<IRustItemCatalog>(_ =>
     new RustItemCatalog(Path.Combine(AppContext.BaseDirectory, "Data", "rust-items.json")));
 builder.Services.AddScoped<IRustPlusCredentialStore, RustPlusCredentialStore>();
+builder.Services.AddSingleton<RustPlusFcmEventBus>();
+builder.Services.AddHostedService<RustPlusFcmListenerWorker>();
 // The FCM auto-pairing listener (Phase 5, gated on RustPlus:EnableFcmListener) registers itself
 // here once it exists. The old hand-rolled checkin/MCS stack was deleted — it was documented as
 // unverified and known-wrong (it sent a raw FCM token where Facepunch expects an Expo token).
