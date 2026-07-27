@@ -25,4 +25,12 @@
     <ProjectReference Include="..\Rustex.Infrastructure\Rustex.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Rust item id -> name lookup for vending search, sourced from the community rustplusplus
+         project's item dump (github.com/alexemanuelol/rustplusplus). Needs refreshing whenever a
+         Rust content update adds items — see IRustItemCatalog. Already picked up as a Content
+         item by the SDK's default globs (Sdk.Web); this just sets it to copy on every build. -->
+    <None Update="Data\rust-items.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

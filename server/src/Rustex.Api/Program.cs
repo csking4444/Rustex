@@ -3,6 +3,7 @@ using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Rustex.Api.Data;
 using Rustex.Api.HealthChecks;
 using Rustex.Api.Hubs;
 using Rustex.Api.Middleware;
@@ -128,6 +129,8 @@ builder.Services.AddHostedService<ServerStatusPollingWorker>();
 
 builder.Services.AddSingleton<RustPlusConnectionManager>();
 builder.Services.AddHostedService<RustPlusSessionWarmupWorker>();
+builder.Services.AddSingleton<IRustItemCatalog>(_ =>
+    new RustItemCatalog(Path.Combine(AppContext.BaseDirectory, "Data", "rust-items.json")));
 // The FCM auto-pairing listener (Phase 5, gated on RustPlus:EnableFcmListener) registers itself
 // here once it exists. The old hand-rolled checkin/MCS stack was deleted — it was documented as
 // unverified and known-wrong (it sent a raw FCM token where Facepunch expects an Expo token).
