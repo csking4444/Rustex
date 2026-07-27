@@ -1,13 +1,15 @@
 using System.Text.Json;
 
-namespace Rustex.Api.Data;
+namespace Rustex.Domain.RustPlus;
 
 public sealed record RustItem(int Id, string Shortname, string Name);
 
 /// <summary>Rust item id → name/shortname lookup, used by vending search so results show
 /// "Assault Rifle" instead of raw item id 4046. Loaded once from Data/rust-items.json, sourced
 /// from the community rustplusplus project's item dump — needs refreshing whenever a Rust
-/// content update adds items; there's no live source for this, Facepunch doesn't publish one.</summary>
+/// content update adds items; there's no live source for this, Facepunch doesn't publish one.
+/// Lives in Domain (not Api) so Infrastructure's vending poll worker can resolve item names for
+/// Shop Alert bodies without a circular project reference.</summary>
 public interface IRustItemCatalog
 {
     RustItem? Find(int itemId);

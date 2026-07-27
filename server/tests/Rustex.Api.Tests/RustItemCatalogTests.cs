@@ -1,4 +1,4 @@
-using Rustex.Api.Data;
+using Rustex.Domain.RustPlus;
 using Xunit;
 
 namespace Rustex.Api.Tests;

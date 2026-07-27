@@ -24,6 +24,13 @@ public class AppDbContext : DbContext
     public DbSet<RustPlusLinkCode> RustPlusLinkCodes => Set<RustPlusLinkCode>();
     public DbSet<RustPlusAccountCredential> RustPlusAccountCredentials => Set<RustPlusAccountCredential>();
 
+    public DbSet<RustPlusTeamMemberState> RustPlusTeamMemberStates => Set<RustPlusTeamMemberState>();
+    public DbSet<VendingMachineSnapshot> VendingMachineSnapshots => Set<VendingMachineSnapshot>();
+    public DbSet<VendingListing> VendingListings => Set<VendingListing>();
+    public DbSet<ShopAlert> ShopAlerts => Set<ShopAlert>();
+    public DbSet<RustPlusSmartDevice> RustPlusSmartDevices => Set<RustPlusSmartDevice>();
+    public DbSet<RustPlusChatMessage> RustPlusChatMessages => Set<RustPlusChatMessage>();
+
     public DbSet<RaidEvent> RaidEvents => Set<RaidEvent>();
     public DbSet<RaidAlarmSettings> RaidAlarmSettings => Set<RaidAlarmSettings>();
 
@@ -136,6 +143,46 @@ public class AppDbContext : DbContext
             e.HasKey(x => x.UserId);
             e.HasOne(x => x.User).WithOne().HasForeignKey<RustPlusAccountCredential>(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.Property(x => x.Status).HasConversion<string>();
+        });
+
+        // ---------- Rust+ features ----------
+        b.Entity<RustPlusTeamMemberState>(e =>
+        {
+            e.HasOne(x => x.Server).WithMany().HasForeignKey(x => x.ServerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.ServerId, x.SteamId }).IsUnique();
+        });
+
+        b.Entity<VendingMachineSnapshot>(e =>
+        {
+            e.HasOne(x => x.Server).WithMany().HasForeignKey(x => x.ServerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.ServerId, x.MarkerId }).IsUnique();
+        });
+
+        b.Entity<VendingListing>(e =>
+        {
+            e.HasOne(x => x.Snapshot).WithMany(s => s.Listings).HasForeignKey(x => x.SnapshotId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.SnapshotId, x.ItemId }).IsUnique();
+        });
+
+        b.Entity<ShopAlert>(e =>
+        {
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Server).WithMany().HasForeignKey(x => x.ServerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.ServerId, x.IsEnabled });
+        });
+
+        b.Entity<RustPlusSmartDevice>(e =>
+        {
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Server).WithMany().HasForeignKey(x => x.ServerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.ServerId, x.EntityId }).IsUnique();
+            e.Property(x => x.Type).HasConversion<string>();
+        });
+
+        b.Entity<RustPlusChatMessage>(e =>
+        {
+            e.HasOne(x => x.Server).WithMany().HasForeignKey(x => x.ServerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.ServerId, x.SentAt });
         });
 
         // ---------- Raid events ----------

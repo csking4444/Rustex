@@ -62,6 +62,22 @@ public class DiscordWebhookSender : IDiscordWebhookSender
         }
     }
 
+    public async Task SendEmbedAsync(string webhookUrl, string title, string description, int color, CancellationToken ct)
+    {
+        var payload = new { embeds = new[] { new { title, description, color, timestamp = DateTimeOffset.UtcNow.ToString("o") } } };
+
+        try
+        {
+            var response = await _http.PostAsJsonAsync(webhookUrl, payload, ct);
+            if (!response.IsSuccessStatusCode)
+                _logger.LogWarning("Discord webhook post to {Url} failed with {Status}", webhookUrl, response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Discord webhook post to {Url} threw", webhookUrl);
+        }
+    }
+
     private static string TierLabel(RaidTier tier) => tier switch
     {
         RaidTier.Tier3 => "Tier 3",

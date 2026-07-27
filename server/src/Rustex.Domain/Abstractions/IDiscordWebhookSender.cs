@@ -8,4 +8,8 @@ namespace Rustex.Domain.Abstractions;
 public interface IDiscordWebhookSender
 {
     Task SendRaidAlertAsync(string webhookUrl, RaidEvent raidEvent, string serverName, CancellationToken ct);
+
+    /// <summary>A plain embed, for callers that aren't a RaidEvent (shop alerts, Rust+ pairing,
+    /// smart alarms). <paramref name="color"/> is a 24-bit RGB value, e.g. 0xD97745.</summary>
+    Task SendEmbedAsync(string webhookUrl, string title, string description, int color, CancellationToken ct);
 }

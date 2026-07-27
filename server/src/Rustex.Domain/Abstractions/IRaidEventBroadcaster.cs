@@ -17,4 +17,10 @@ public interface IRaidEventBroadcaster
     /// <summary>Plain notification-style alert for ClientKind.Desktop connections — rendered as
     /// a browser Notification, no ringing/audio escalation.</summary>
     Task BroadcastRaidAlertNotificationAsync(Guid userId, object payload, CancellationToken ct);
+
+    /// <summary>Generic "a Notification row was created" push, used by INotificationDispatcher
+    /// for anything that isn't a raid-severity alert (shop alerts, Rust+ pairing, smart alarms) —
+    /// the frontend's notification center invalidates its query cache on this rather than each
+    /// feature needing its own SignalR event name.</summary>
+    Task BroadcastNotificationCreatedAsync(Guid userId, object payload, CancellationToken ct);
 }

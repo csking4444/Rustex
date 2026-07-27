@@ -34,6 +34,19 @@ public class RustPlusConnectionManager : IAsyncDisposable
 
     public IReadOnlyCollection<Guid> ActiveSessionIds => _sessions.Keys.ToArray();
 
+    /// <summary>Non-blocking — for background pollers iterating every active session, which
+    /// should just skip a pairing this tick if it's mid-reconnect rather than waiting on it.</summary>
+    public bool TryGetClient(Guid pairingId, out RustPlusClient? client)
+    {
+        if (_sessions.TryGetValue(pairingId, out var session) && session.TryGetCurrentClient(out var c))
+        {
+            client = c;
+            return true;
+        }
+        client = null;
+        return false;
+    }
+
     private RustPlusSession GetOrCreateSession(RustPlusPairing pairing, int playerToken)
     {
         if (_sessions.TryGetValue(pairing.Id, out var existing)) return existing;

@@ -20,4 +20,7 @@ public class SignalRRaidEventBroadcaster : IRaidEventBroadcaster
 
     public Task BroadcastRaidAlertNotificationAsync(Guid userId, object payload, CancellationToken ct) =>
         _hub.Clients.Group(DashboardHub.UserGroupName(userId)).SendAsync("RaidAlertNotification", payload, ct);
+
+    public Task BroadcastNotificationCreatedAsync(Guid userId, object payload, CancellationToken ct) =>
+        _hub.Clients.Group(DashboardHub.UserGroupName(userId)).SendAsync("NotificationCreated", payload, ct);
 }

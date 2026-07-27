@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Rustex.Api.Data;
+using Rustex.Domain.RustPlus;
 
 namespace Rustex.Api.Controllers;
 

@@ -80,6 +80,12 @@ public sealed class RustPlusClient : IAsyncDisposable
         return response.TeamInfo ?? throw ErrorOrUnexpected(response);
     }
 
+    public async Task<AppTime> GetTimeAsync(CancellationToken ct)
+    {
+        var response = await SendAsync(new AppRequest { GetTime = new AppEmpty() }, ct);
+        return response.Time ?? throw ErrorOrUnexpected(response);
+    }
+
     public async Task<IReadOnlyList<AppMarker>> GetMapMarkersAsync(CancellationToken ct)
     {
         var response = await SendAsync(new AppRequest { GetMapMarkers = new AppEmpty() }, ct);

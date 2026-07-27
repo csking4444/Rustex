@@ -25,15 +25,18 @@ public class RustPlusController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly RustPlusConnectionManager _connectionManager;
+    private readonly IRustItemCatalog _catalog;
     private readonly IEncryptionService? _encryption;
 
     public RustPlusController(
         AppDbContext db,
         RustPlusConnectionManager connectionManager,
+        IRustItemCatalog catalog,
         IEncryptionService? encryption = null)
     {
         _db = db;
         _connectionManager = connectionManager;
+        _catalog = catalog;
         _encryption = encryption;
     }
 
@@ -145,6 +148,63 @@ public class RustPlusController : ControllerBase
         {
             return StatusCode(502, $"Rust+ request failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// DB-backed team roster, kept fresh by RustPlusTeamTrackingWorker (teamChanged broadcasts +
+    /// a 30s fallback poll) — unlike GET team, this never blocks on a live socket round-trip.
+    /// </summary>
+    [HttpGet("team-state")]
+    public async Task<ActionResult<List<RustPlusTeamMemberStateResponse>>> GetTeamState(Guid serverId, CancellationToken ct)
+    {
+        var hasPairing = await _db.RustPlusPairings.AnyAsync(p => p.ServerId == serverId && p.UserId == CurrentUserId, ct);
+        if (!hasPairing) return NotFound("No Rust+ pairing saved for this server yet.");
+
+        var members = await _db.RustPlusTeamMemberStates
+            .Where(s => s.ServerId == serverId)
+            .OrderByDescending(s => s.IsOnline).ThenBy(s => s.Name)
+            .Select(s => new RustPlusTeamMemberStateResponse(s.SteamId, s.Name, s.IsOnline, s.IsAlive, s.LastX, s.LastY, s.LastGrid, s.LastSeenAt, s.UpdatedAt))
+            .ToListAsync(ct);
+        return members;
+    }
+
+    /// <summary>
+    /// DB-backed vending search, populated by RustPlusVendingPollWorker — search reads the
+    /// database, so typing on every keystroke never round-trips to the game server.
+    /// </summary>
+    [HttpGet("vending/search")]
+    public async Task<ActionResult<List<RustPlusVendingSearchResultResponse>>> SearchVending(
+        Guid serverId, [FromQuery] string? q, [FromQuery] int? maxCost, [FromQuery] bool inStockOnly = false, CancellationToken ct = default)
+    {
+        var hasPairing = await _db.RustPlusPairings.AnyAsync(p => p.ServerId == serverId && p.UserId == CurrentUserId, ct);
+        if (!hasPairing) return NotFound("No Rust+ pairing saved for this server yet.");
+
+        var listings = await _db.VendingListings
+            .Include(l => l.Snapshot)
+            .Where(l => l.Snapshot.ServerId == serverId)
+            .ToListAsync(ct);
+
+        var results = new List<RustPlusVendingSearchResultResponse>();
+        foreach (var listing in listings)
+        {
+            if (maxCost is not null && listing.CostPerItem > maxCost) continue;
+            if (inStockOnly && listing.AmountInStock <= 0) continue;
+
+            var item = _catalog.Find(listing.ItemId);
+            var itemName = item?.Name ?? $"Item {listing.ItemId}";
+            if (!string.IsNullOrWhiteSpace(q) &&
+                !itemName.Contains(q, StringComparison.OrdinalIgnoreCase) &&
+                !(item?.Shortname.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)) continue;
+
+            var currency = _catalog.Find(listing.CurrencyId);
+            results.Add(new RustPlusVendingSearchResultResponse(
+                listing.Snapshot.MarkerId, listing.Snapshot.Name, listing.Snapshot.Grid,
+                listing.ItemId, itemName, listing.CostPerItem, listing.CurrencyId,
+                currency?.Name ?? (listing.CurrencyIsBlueprint ? "Scrap" : $"Item {listing.CurrencyId}"),
+                listing.CurrencyIsBlueprint, listing.AmountInStock, listing.UpdatedAt));
+        }
+
+        return results.OrderBy(r => r.CostPerItem).Take(200).ToList();
     }
 
     private async Task<(RustPlusClient? Client, ActionResult? Error)> ConnectAsync(Guid serverId, CancellationToken ct)

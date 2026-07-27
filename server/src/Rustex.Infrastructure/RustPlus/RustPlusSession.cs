@@ -68,6 +68,22 @@ public sealed class RustPlusSession : IAsyncDisposable
         throw new InvalidOperationException("Rust+ session disconnected while waiting to become ready — it will keep retrying in the background.");
     }
 
+    /// <summary>Non-blocking variant for background pollers that should just skip a server this
+    /// tick if it's mid-reconnect, rather than waiting for it.</summary>
+    public bool TryGetCurrentClient(out RustPlusClient? client)
+    {
+        lock (_gateLock)
+        {
+            if (_current is { IsHealthy: true })
+            {
+                client = _current;
+                return true;
+            }
+        }
+        client = null;
+        return false;
+    }
+
     private async Task SupervisorLoopAsync(CancellationToken ct)
     {
         var attempt = 0;

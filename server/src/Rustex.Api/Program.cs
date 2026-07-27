@@ -4,12 +4,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Rustex.Api.Auth;
-using Rustex.Api.Data;
 using Rustex.Api.HealthChecks;
 using Rustex.Api.Hubs;
 using Rustex.Api.Middleware;
 using Rustex.Api.Startup;
 using Rustex.Domain.Abstractions;
+using Rustex.Domain.RustPlus;
 using Rustex.Infrastructure.Auth;
 using Rustex.Infrastructure.Caching;
 using Rustex.Infrastructure.Emergency;
@@ -152,11 +152,15 @@ builder.Services.AddHostedService<ServerStatusPollingWorker>();
 
 builder.Services.AddSingleton<RustPlusConnectionManager>();
 builder.Services.AddHostedService<RustPlusSessionWarmupWorker>();
+builder.Services.AddHostedService<RustPlusTeamTrackingWorker>();
+builder.Services.AddHostedService<RustPlusVendingPollWorker>();
+builder.Services.AddHostedService<RustPlusChatAssistantWorker>();
 builder.Services.AddSingleton<IRustItemCatalog>(_ =>
     new RustItemCatalog(Path.Combine(AppContext.BaseDirectory, "Data", "rust-items.json")));
 builder.Services.AddScoped<IRustPlusCredentialStore, RustPlusCredentialStore>();
 builder.Services.AddSingleton<RustPlusFcmEventBus>();
 builder.Services.AddHostedService<RustPlusFcmListenerWorker>();
+builder.Services.AddHostedService<RustPlusSmartDevicesWorker>();
 // The FCM auto-pairing listener (Phase 5, gated on RustPlus:EnableFcmListener) registers itself
 // here once it exists. The old hand-rolled checkin/MCS stack was deleted — it was documented as
 // unverified and known-wrong (it sent a raw FCM token where Facepunch expects an Expo token).
@@ -167,7 +171,7 @@ builder.Services.AddHttpClient<IDiscordWebhookSender, DiscordWebhookSender>();
 builder.Services.Configure<WebPushOptions>(builder.Configuration.GetSection(WebPushOptions.SectionName));
 builder.Services.AddSingleton<IWebPushSender, WebPushSender>();
 builder.Services.AddScoped<IEmergencyAlertDispatcher, EmergencyAlertDispatcher>();
-builder.Services.AddSingleton<IRustPlusNotificationListener, RustPlusNotificationListener>();
+builder.Services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
 
 // ---------- API ----------
 builder.Services.AddControllers()
