@@ -85,7 +85,7 @@ Required for the site to talk to the API at all:
 | Variable | Value |
 |---|---|
 | `Cors__AllowedOrigins__0` | `https://rustex-site.vercel.app` — without this the browser blocks every call |
-| `App__FrontendUrl` | `https://rustex-site.vercel.app` — where Stripe returns after checkout |
+| `App__FrontendUrl` | `https://rustex-site.vercel.app` — the site this API serves |
 | `Steam__ReturnUrl` | `https://<your-api>/api/auth/steam/callback` |
 | `Steam__Realm` | `https://<your-api>` |
 | `Steam__FrontendCallbackUrl` | `https://rustex-site.vercel.app/` — tokens come back in the URL fragment |
@@ -94,14 +94,6 @@ Required for the site to talk to the API at all:
 Steam signs `return_to`, and the callback rejects a mismatch — so `Steam__ReturnUrl` must be the
 exact public URL the browser reaches, not an internal hostname.
 
-Billing (optional — without it the app runs and reports plans as not purchasable):
-
-`Stripe__SecretKey`, `Stripe__WebhookSecret`, and the six
-`Stripe__Prices__{scout|raider|clan}__{Monthly|Yearly}` ids. Point the Stripe webhook endpoint at
-`https://<your-api>/api/billing/webhook`. See [BILLING.md](BILLING.md).
-
-Complimentary access, if you want to grant a plan without payment:
-`Billing__ComplimentaryGrants__0__SteamId`, `__Tier` (`scout`/`raider`/`clan`), `__Reason`.
 
 ### Then point the site at it
 
@@ -117,7 +109,6 @@ For the React client instead, set `VITE_API_BASE_URL` and `VITE_HUB_URL` in Verc
 
 ```bash
 curl https://<your-api>/health                 # 200
-curl https://<your-api>/api/billing/plans      # 200, three plans
 curl -o /dev/null -w '%{http_code}\n' https://<your-api>/api/servers   # 401 — protected
 ```
 

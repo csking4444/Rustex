@@ -7,7 +7,6 @@ using Rustex.Api.Dtos;
 using Rustex.Domain.Abstractions;
 using Rustex.Domain.Entities;
 using Rustex.Infrastructure.Auth;
-using Rustex.Infrastructure.Billing;
 using Rustex.Infrastructure.Persistence;
 
 namespace Rustex.Api.Controllers;
@@ -29,7 +28,6 @@ public class AuthController : ControllerBase
     private readonly DiscordOAuthOptions _discordOptions;
     private readonly GoogleOAuthOptions _googleOptions;
     private readonly SteamAuthOptions _steamOptions;
-    private readonly IComplimentaryGrantReconciler _grants;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -44,7 +42,6 @@ public class AuthController : ControllerBase
         IOptions<DiscordOAuthOptions> discordOptions,
         IOptions<GoogleOAuthOptions> googleOptions,
         IOptions<SteamAuthOptions> steamOptions,
-        IComplimentaryGrantReconciler grants,
         ILogger<AuthController> logger)
     {
         _discord = discord;
@@ -58,7 +55,6 @@ public class AuthController : ControllerBase
         _discordOptions = discordOptions.Value;
         _googleOptions = googleOptions.Value;
         _steamOptions = steamOptions.Value;
-        _grants = grants;
         _logger = logger;
     }
 
@@ -393,10 +389,6 @@ public class AuthController : ControllerBase
 
         await _db.SaveChangesAsync(ct);
 
-        // A complimentary plan may have been configured before this person ever signed in,
-        // in which case the startup pass could not match it to an account. Now it can.
-        try { await _grants.ReconcileAsync(steamId, ct); }
-        catch (Exception ex) { _logger.LogError(ex, "Complimentary grant check failed for {SteamId}", steamId); }
 
         var tokens = await IssueTokenPairAsync(loginUser, ct);
         return Redirect(BuildFrontendRedirect(_steamOptions.FrontendCallbackUrl, tokens));

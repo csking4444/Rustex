@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Rustex.Api.Auth;
-using Rustex.Domain.Billing;
 using Rustex.Api.Dtos;
 using Rustex.Domain.Entities;
 using Rustex.Infrastructure.Persistence;
@@ -13,17 +12,11 @@ namespace Rustex.Api.Controllers;
 [ApiController]
 [Route("api/servers")]
 [Authorize]
-[RequiresSubscription]
 public class ServersController : ControllerBase
 {
     private readonly AppDbContext _db;
-    private readonly ISubscriptionService _subscriptions;
 
-    public ServersController(AppDbContext db, ISubscriptionService subscriptions)
-    {
-        _db = db;
-        _subscriptions = subscriptions;
-    }
+    public ServersController(AppDbContext db) => _db = db;
 
     private Guid CurrentUserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
 
@@ -74,26 +67,9 @@ public class ServersController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ServerResponse>> Create([FromBody] CreateServerRequest request, CancellationToken ct)
     {
-        var userId = CurrentUserId;
-
-        // The plan's server allowance is enforced here rather than only in the UI — hiding the
-        // "add server" button does nothing to stop a direct POST.
-        var entitlement = await _subscriptions.GetEntitlementAsync(userId, ct);
-        var owned = await _db.RustServers.CountAsync(s => s.OwnerUserId == userId, ct);
-        if (owned >= entitlement.ServerLimit)
-        {
-            return StatusCode(EntitlementStatus.UpgradeRequired, new
-            {
-                error = "server_limit_reached",
-                message = $"Your {entitlement.PlanName} plan covers {entitlement.ServerLimit} server(s). Upgrade to add more.",
-                limit = entitlement.ServerLimit,
-                current = owned,
-            });
-        }
-
         var server = new RustServer
         {
-            OwnerUserId = userId,
+            OwnerUserId = CurrentUserId,
             Name = request.Name,
             IpAddress = request.IpAddress,
             GamePort = request.GamePort,

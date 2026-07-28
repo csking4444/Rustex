@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Rustex.Api.Auth;
-using Rustex.Domain.Billing;
 using Rustex.Api.Dtos;
 using Rustex.Domain.Entities;
 using Rustex.Domain.RustPlus;
@@ -23,7 +22,6 @@ namespace Rustex.Api.Controllers;
 [ApiController]
 [Route("api/servers/{serverId:guid}/rustplus")]
 [Authorize]
-[RequiresSubscription]
 public class RustPlusController : ControllerBase
 {
     private readonly AppDbContext _db;

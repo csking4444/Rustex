@@ -39,20 +39,13 @@ public class EndpointAuthorizationTests
         "RustItemsController.Search",
         "RustItemsController.GetById",
 
-        // The payment provider has no session with us; this endpoint is secured by verifying an
-        // HMAC signature over the raw body instead. See BillingWebhookController.
-        "BillingWebhookController.Receive",
-
-        // Pricing must render before sign-in.
-        "SubscriptionsController.GetPlans",
-
         // Redeemed by the rustex-pair helper using a short-lived link code, on a separate JWT
         // scheme with its own audience.
         "RustPlusAccountController.RedeemLinkCode",
     ];
 
     private static IEnumerable<Type> Controllers() =>
-        typeof(SubscriptionsController).Assembly
+        typeof(ServersController).Assembly
             .GetTypes()
             .Where(t => typeof(ControllerBase).IsAssignableFrom(t) && !t.IsAbstract);
 

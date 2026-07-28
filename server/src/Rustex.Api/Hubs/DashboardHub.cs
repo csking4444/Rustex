@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Rustex.Api.Auth;
 using Rustex.Domain.Abstractions;
-using Rustex.Domain.Billing;
 
 namespace Rustex.Api.Hubs;
 
@@ -13,20 +12,17 @@ public class DashboardHub : Hub
     private readonly IClientConnectionRegistry _connectionRegistry;
     private readonly ILiveScopeAuthorizer _scopeAuthorizer;
     private readonly ILiveStateStore _liveState;
-    private readonly ISubscriptionService _subscriptions;
     private readonly ILogger<DashboardHub> _log;
 
     public DashboardHub(
         IClientConnectionRegistry connectionRegistry,
         ILiveScopeAuthorizer scopeAuthorizer,
         ILiveStateStore liveState,
-        ISubscriptionService subscriptions,
         ILogger<DashboardHub> log)
     {
         _connectionRegistry = connectionRegistry;
         _scopeAuthorizer = scopeAuthorizer;
         _liveState = liveState;
-        _subscriptions = subscriptions;
         _log = log;
     }
 
@@ -74,11 +70,6 @@ public class DashboardHub : Hub
             return SubscribeResult.Denied("You do not have access to that scope.");
         }
 
-        // Paid product: an expired or cancelled plan must stop the live feed too, not just the
-        // REST endpoints, or the dashboard would keep updating for a lapsed account.
-        var entitlement = await _subscriptions.GetEntitlementAsync(userId.Value, Context.ConnectionAborted);
-        if (!entitlement.IsEntitled)
-            return SubscribeResult.Denied("An active plan is required for live updates.");
 
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(parsed));
 

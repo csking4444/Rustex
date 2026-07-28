@@ -206,73 +206,6 @@ namespace Rustex.Infrastructure.Migrations
                     b.ToTable("CallAlertSettings");
                 });
 
-            modelBuilder.Entity("Rustex.Domain.Entities.Invoice", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<long>("AmountDueCents")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("AmountPaidCents")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("character varying(8)");
-
-                    b.Property<string>("HostedInvoiceUrl")
-                        .HasColumnType("text");
-
-                    b.Property<string>("InvoicePdfUrl")
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset?>("IssuedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Number")
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset?>("PaidAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("PeriodEnd")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("PeriodStart")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ProviderInvoiceId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("SubscriptionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProviderInvoiceId")
-                        .IsUnique();
-
-                    b.HasIndex("SubscriptionId");
-
-                    b.HasIndex("UserId", "IssuedAt");
-
-                    b.ToTable("Invoices");
-                });
-
             modelBuilder.Entity("Rustex.Domain.Entities.MapData", b =>
                 {
                     b.Property<Guid>("Id")
@@ -459,52 +392,6 @@ namespace Rustex.Infrastructure.Migrations
                     b.ToTable("NotificationHistory");
                 });
 
-            modelBuilder.Entity("Rustex.Domain.Entities.PaymentMethodSummary", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Brand")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("ExpMonth")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("ExpYear")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsDefault")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Last4")
-                        .HasMaxLength(4)
-                        .HasColumnType("character varying(4)");
-
-                    b.Property<string>("ProviderPaymentMethodId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProviderPaymentMethodId")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("PaymentMethods");
-                });
-
             modelBuilder.Entity("Rustex.Domain.Entities.Permission", b =>
                 {
                     b.Property<Guid>("Id")
@@ -565,33 +452,6 @@ namespace Rustex.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("PhoneNumbers");
-                });
-
-            modelBuilder.Entity("Rustex.Domain.Entities.ProcessedWebhookEvent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("ProcessedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ProviderEventId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProcessedAt");
-
-                    b.HasIndex("ProviderEventId")
-                        .IsUnique();
-
-                    b.ToTable("ProcessedWebhookEvents");
                 });
 
             modelBuilder.Entity("Rustex.Domain.Entities.PushSubscription", b =>
@@ -1172,78 +1032,6 @@ namespace Rustex.Infrastructure.Migrations
                     b.ToTable("ShopAlerts");
                 });
 
-            modelBuilder.Entity("Rustex.Domain.Entities.Subscription", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("CancelAtPeriodEnd")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset?>("CanceledAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CompReason")
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("CurrentPeriodEnd")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("CurrentPeriodStart")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Interval")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("PlanTier")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("ProviderCustomerId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ProviderSubscriptionId")
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset?>("ProviderUpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset?>("TrialEndsAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProviderCustomerId");
-
-                    b.HasIndex("ProviderSubscriptionId")
-                        .IsUnique();
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("Subscriptions");
-                });
-
             modelBuilder.Entity("Rustex.Domain.Entities.Team", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1682,16 +1470,6 @@ namespace Rustex.Infrastructure.Migrations
                     b.Navigation("Server");
                 });
 
-            modelBuilder.Entity("Rustex.Domain.Entities.Invoice", b =>
-                {
-                    b.HasOne("Rustex.Domain.Entities.Subscription", "Subscription")
-                        .WithMany("Invoices")
-                        .HasForeignKey("SubscriptionId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Subscription");
-                });
-
             modelBuilder.Entity("Rustex.Domain.Entities.MapData", b =>
                 {
                     b.HasOne("Rustex.Domain.Entities.RustServer", "Server")
@@ -1745,17 +1523,6 @@ namespace Rustex.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Notification");
-                });
-
-            modelBuilder.Entity("Rustex.Domain.Entities.PaymentMethodSummary", b =>
-                {
-                    b.HasOne("Rustex.Domain.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Rustex.Domain.Entities.PhoneNumber", b =>
@@ -1943,17 +1710,6 @@ namespace Rustex.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Rustex.Domain.Entities.Subscription", b =>
-                {
-                    b.HasOne("Rustex.Domain.Entities.User", "User")
-                        .WithOne()
-                        .HasForeignKey("Rustex.Domain.Entities.Subscription", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Rustex.Domain.Entities.Team", b =>
                 {
                     b.HasOne("Rustex.Domain.Entities.User", "Owner")
@@ -2084,11 +1840,6 @@ namespace Rustex.Infrastructure.Migrations
                     b.Navigation("RaidEvents");
 
                     b.Navigation("StatusSnapshots");
-                });
-
-            modelBuilder.Entity("Rustex.Domain.Entities.Subscription", b =>
-                {
-                    b.Navigation("Invoices");
                 });
 
             modelBuilder.Entity("Rustex.Domain.Entities.Team", b =>

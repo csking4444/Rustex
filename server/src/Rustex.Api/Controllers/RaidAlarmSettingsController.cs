@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Rustex.Api.Auth;
-using Rustex.Domain.Billing;
 using Rustex.Api.Dtos;
 using Rustex.Domain.Entities;
 using Rustex.Infrastructure.Persistence;
@@ -13,7 +12,6 @@ namespace Rustex.Api.Controllers;
 [ApiController]
 [Route("api/servers/{serverId:guid}/raid-alarm-settings")]
 [Authorize]
-[RequiresFeature(Features.RaidAlarms)]
 public class RaidAlarmSettingsController : ControllerBase
 {
     private readonly AppDbContext _db;

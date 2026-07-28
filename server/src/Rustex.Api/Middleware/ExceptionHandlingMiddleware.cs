@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Rustex.Domain.Billing;
 
 namespace Rustex.Api.Middleware;
 
@@ -67,13 +66,6 @@ public class ExceptionHandlingMiddleware
 
     private static (int Status, string Error, string Message) Classify(Exception ex) => ex switch
     {
-        // The provider rejected something the user can fix — a declined card, a price that no
-        // longer exists. Its message is written for customers, so it is safe to pass through.
-        PaymentProviderException => (StatusCodes.Status400BadRequest, "payment_error", ex.Message),
-
-        // A valid request that does not make sense for the current subscription state.
-        SubscriptionStateException => (StatusCodes.Status409Conflict, "subscription_state", ex.Message),
-
         // Our own argument guards, e.g. an unparseable id that got past model validation.
         ArgumentException or FormatException => (StatusCodes.Status400BadRequest, "bad_request", "The request was not valid."),
 

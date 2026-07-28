@@ -6,29 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23B3261E%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23D97745%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227.5%22%20fill%3D%22url%28%23g%29%22%2F%3E%3Cg%20transform%3D%22translate%284%204%29%22%20fill%3D%22%23fff%22%3E%3Crect%20x%3D%224.9%22%20y%3D%223.4%22%20width%3D%223.7%22%20height%3D%2217.2%22%20rx%3D%221.2%22%2F%3E%3Cpath%20d%3D%22M8.0%203.4h3.7a5.3%205.3%200%200%201%200%2010.6H8.0v-3.4h3.7a1.9%201.9%200%200%200%200-3.8H8.0Z%22%2F%3E%3Cpath%20d%3D%22M10.9%2012.7h3.8l4.6%207.9h-3.8Z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
 <meta name="theme-color" content="#0D0D0D">
-
-<!-- ===================================================================
-     DEPLOYMENT CONFIG — the one thing you need to change per environment.
-
-     Rustex is a client of the Rustex API: sign-in, subscriptions, billing
-     and live data all come from there, so there is exactly one place that
-     decides who you are and what you have paid for.
-
-     Point this at wherever that API is deployed. It cannot be same-origin —
-     Vercel serves this file statically and cannot run the .NET API.
-
-       local docker   http://localhost:8080
-       deployed       https://api.yourdomain.com
-
-     Must be set here, before the main script runs, because the script reads
-     it once at parse time.
-
-     The API also needs to know about this page, via two of its own settings:
-       Cors__AllowedOrigins__0   the origin this page is served from
-       Steam__FrontendCallbackUrl  this page's URL, where sign-in returns to
-     =================================================================== -->
-<script>window.RUSTEX_API_BASE = "http://localhost:8080";</script>
-
 <style>
 /* ===================================================================
    RUSTEX — design tokens
@@ -346,9 +323,6 @@ img,svg{display:block;}
   border-top-color:var(--orange); animation:spin .7s linear infinite; flex-shrink:0;}
 .auth-step.on .mk .spin{width:9px; height:9px; border-width:1.6px;}
 @keyframes spin{to{transform:rotate(360deg)}}
-/* Inline progress inside a button while a request is in flight (see busyButton). */
-.btn .spin{width:12px; height:12px; margin-right:7px; display:inline-block; vertical-align:-1px;}
-.btn:disabled{opacity:.62; cursor:not-allowed;}
 .auth-error{display:flex; gap:10px; text-align:left; padding:12px 13px; border-radius:var(--r-md);
   background:var(--crimson-soft); border:1px solid rgba(179,38,30,.32); margin-bottom:16px;}
 .auth-error .icon{width:16px; height:16px; color:#ef6a62; flex-shrink:0; margin-top:1px;}
@@ -436,34 +410,27 @@ select.inp{cursor:pointer;}
 .demo-banner b{color:var(--text);}
 body:not(.is-demo) .demo-banner{display:none;}
 
-/* --- dashboard layout & hierarchy --- */
-/* Tabs stay reachable while scrolling a long section — they sit just under the topbar, which
-   is itself sticky at 0. */
+/* --- dashboard layout & responsive ---------------------------------------
+   The dashboard sections are their own 12-column grid, so the older
+   `.widget-grid` breakpoint never applied to them: widgets kept `span 4` all
+   the way down to phone width. Combined with grid items defaulting to
+   min-width:auto, this forced ~326px of horizontal page scroll at 414px.
+   ------------------------------------------------------------------------ */
+
+/* Section tabs stay reachable while scrolling a long section. */
 .dash-tabs{position:sticky; top:56px; z-index:40; margin-bottom:18px;
   background:var(--surface-2); backdrop-filter:blur(10px);}
 
-/* A quiet label above each group so a section reads as a group rather than a wall of cards. */
-.dash-group{grid-column:span 12; display:flex; align-items:baseline; gap:10px; margin:4px 0 -4px;}
-.dash-group h3{font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
-  color:var(--text-3);}
-.dash-group .rule{flex:1; height:1px; background:var(--border);}
-
-.widget{border-radius:var(--r-lg);}
 .widget:focus-within{border-color:var(--orange); outline:none;}
 
-/* Grid and flex items default to min-width:auto, so a single unbreakable run of content forces
-   its whole track wider than the viewport — which is what made the dashboard scroll sideways on
-   a phone even after the widgets themselves collapsed. Allowing them to shrink is the fix. */
+/* Let grid and flex children shrink; without this a single unbreakable run of
+   content forces its whole track wider than the viewport. */
 .dash-section.active > *{min-width:0;}
 .widget, .card{min-width:0;}
 .widget *, .card *{min-width:0;}
 
-/* --- dashboard: responsive tiers ---
-   The dashboard sections are their own 12-column grid, so the older `.widget-grid` rules never
-   applied to them: widgets kept `span 4` all the way down to phone width and ended up a few
-   characters wide. These tiers are what actually make the dashboard usable below 1080px. */
 @media (max-width:1080px){
-  /* Tablet: two up rather than collapsing straight to one — there is room for a pair. */
+  /* Tablet: two up, rather than collapsing straight to one column. */
   .dash-section.active > .w-4,
   .dash-section.active > .w-5,
   .dash-section.active > .w-7,
@@ -471,8 +438,7 @@ body:not(.is-demo) .demo-banner{display:none;}
   .dash-tabs{top:0;}
 }
 @media (max-width:760px){
-  /* Phone: one card per row, tighter gutters, and smaller card padding so content — not
-     chrome — gets the width. */
+  /* Phone: one card per row, tighter gutters, 44px touch targets. */
   .dash-section.active{gap:12px;}
   .dash-section.active > .w-4,
   .dash-section.active > .w-5,
@@ -482,55 +448,41 @@ body:not(.is-demo) .demo-banner{display:none;}
   .card{padding:16px;}
   .stat-row{grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:16px;}
   .topbar{padding:10px 16px; gap:10px;}
-  /* Comfortable touch targets — 44px is the accessibility floor for a tap. */
   .dash-tab{padding:11px 14px; min-height:44px;}
   .btn{min-height:40px;}
 }
 @media (max-width:430px){
   .stat-row{grid-template-columns:1fr;}
-  .dash-group h3{font-size:11px;}
 }
 
-/* --- topbar: stop it forcing the page wider than the screen ---
-   .top-actions is a fixed row of dropdowns (server, team, notifications, user). At ~377px it
-   pushed the document to 740px on a phone, so the whole dashboard scrolled sideways. Two fixes:
-   let the row shrink at all, then drop the labels that are only convenience. */
+/* The topbar's control row was a fixed ~377px that never shrank, pushing the
+   document to 740px wide on a phone. Let it shrink, then drop the labels that
+   are only convenience. */
 .topbar{min-width:0;}
-.top-actions{min-width:0; flex-shrink:1;}
-/* The page title on the left must give way before the controls on the right do. */
 .topbar > *:not(.top-actions){min-width:0;}
+.top-actions{min-width:0; flex-shrink:1;}
 @media (max-width:760px){
-  /* The server and team pickers duplicate what the sections themselves offer, so on a phone
-     they lose their text and become icon-only rather than eating the whole bar. */
   .top-actions .selector{padding:0 9px; gap:5px;}
   .top-actions .selector span{display:none;}
   .top-actions{gap:7px;}
-  /* Avatar only — the name is already on the settings screen this chip opens. */
   .top-actions .user-chip span{display:none;}
   .top-actions .user-chip{padding:4px; gap:4px;}
 }
 @media (max-width:520px){
-  /* Below this there is genuinely not room for four controls. Team selection is reachable from
-     its own section, so it is the one that goes. */
+  /* Team selection is reachable from its own section, so it is the one that goes. */
   .top-actions > .dropdown:nth-child(2){display:none;}
 }
 @media (max-width:400px){
-  /* Smallest phones (SE-class): keep only notifications and the account chip. The server
-     picker lives in the sections themselves, so nothing becomes unreachable. */
   .top-actions > .dropdown:first-child{display:none;}
   .topbar{padding:10px 12px;}
   .container{padding:0 14px;}
 }
 
-/* The command palette trigger is styled further down the sheet, so these overrides are scoped
-   through .topbar to out-specify it rather than relying on source order. */
+/* Command palette trigger: the full placeholder and ⌘K hint spilled out from
+   under the icons on a phone. Collapses to the search icon, same palette. */
 .topbar .top-search{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-@media (max-width:900px){
-  .topbar .top-search kbd{display:none;}
-}
+@media (max-width:900px){ .topbar .top-search kbd{display:none;} }
 @media (max-width:760px){
-  /* The full placeholder and ⌘K hint do not fit on a phone — the label spilled out from under
-     the icons — so it collapses to the search icon, which opens the same palette. */
   .topbar .top-search{font-size:0; gap:0; padding:0; width:38px; height:38px; max-width:38px;
     justify-content:center; flex:0 0 auto;}
   .topbar .top-search .icon{width:16px; height:16px;}
@@ -1971,7 +1923,7 @@ body.billing #billing-view{display:block;}
             <span class="per" data-per>/ month</span>
           </div>
           <ul><li><svg class="icon"><use href="#i-check"/></svg>2 paired servers</li><li><svg class="icon"><use href="#i-check"/></svg>Team tracker &amp; map</li><li><svg class="icon"><use href="#i-check"/></svg>Raid alarms to web push</li><li><svg class="icon"><use href="#i-check"/></svg>Decay timers</li><li><svg class="icon"><use href="#i-check"/></svg>7-day event history</li><li class="off"><svg class="icon"><use href="#i-minus"/></svg>Phone call escalation</li><li class="off"><svg class="icon"><use href="#i-minus"/></svg>Vending &amp; shop alerts</li></ul>
-          <button class="btn btn-outline btn-block" onclick="choosePlan('scout', this)">Choose Scout</button>
+          <button class="btn btn-outline btn-block" onclick="choosePlan('scout')">Choose Scout</button>
         </div>
         <div class="plan featured" data-plan="raider">
           <span class="plan-tag">Most popular</span>
@@ -1984,7 +1936,7 @@ body.billing #billing-view{display:block;}
             <span class="per" data-per>/ month</span>
           </div>
           <ul><li><svg class="icon"><use href="#i-check"/></svg>Up to 5 paired servers</li><li><svg class="icon"><use href="#i-check"/></svg>Everything in Scout</li><li><svg class="icon"><use href="#i-check"/></svg>Phone call escalation</li><li><svg class="icon"><use href="#i-check"/></svg>Vending search &amp; shop alerts</li><li><svg class="icon"><use href="#i-check"/></svg>Smart device control</li><li><svg class="icon"><use href="#i-check"/></svg>Genetics lab &amp; recycler</li><li><svg class="icon"><use href="#i-check"/></svg>30-day event history</li></ul>
-          <button class="btn btn-primary btn-block" onclick="choosePlan('raider', this)">Choose Raider</button>
+          <button class="btn btn-primary btn-block" onclick="choosePlan('raider')">Choose Raider</button>
         </div>
         <div class="plan" data-plan="clan">
           
@@ -1997,7 +1949,7 @@ body.billing #billing-view{display:block;}
             <span class="per" data-per>/ month</span>
           </div>
           <ul><li><svg class="icon"><use href="#i-check"/></svg>Unlimited paired servers</li><li><svg class="icon"><use href="#i-check"/></svg>Everything in Raider</li><li><svg class="icon"><use href="#i-check"/></svg>Unlimited team members</li><li><svg class="icon"><use href="#i-check"/></svg>Priority alarm routing</li><li><svg class="icon"><use href="#i-check"/></svg>Chat assistant with custom commands</li><li><svg class="icon"><use href="#i-check"/></svg>Full event history &amp; export</li><li><svg class="icon"><use href="#i-check"/></svg>Priority support</li></ul>
-          <button class="btn btn-outline btn-block" onclick="choosePlan('clan', this)">Choose Clan</button>
+          <button class="btn btn-outline btn-block" onclick="choosePlan('clan')">Choose Clan</button>
         </div>
     </div>
     <p class="text-3" style="font-size:11.5px;margin-top:20px;text-align:center;">
@@ -2213,8 +2165,8 @@ body.billing #billing-view{display:block;}
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
           <button class="btn btn-primary btn-sm" onclick="goPricing()" data-bill="upgrade"><svg class="icon" style="width:14px;height:14px"><use href="#i-trend-up"/></svg>Upgrade plan</button>
           <button class="btn btn-outline btn-sm" onclick="goPricing()" data-bill="downgrade">Change plan</button>
-          <button class="btn btn-outline btn-sm" onclick="reactivateSub(this)" data-bill="reactivate">Reactivate subscription</button>
-          <button class="btn btn-ghost btn-sm" onclick="cancelSub(this)" data-bill="cancel" style="color:#ef6a62;">Cancel subscription</button>
+          <button class="btn btn-outline btn-sm" onclick="reactivateSub()" data-bill="reactivate">Reactivate subscription</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelSub()" data-bill="cancel" style="color:#ef6a62;">Cancel subscription</button>
         </div>
       </div>
 
@@ -2227,7 +2179,7 @@ body.billing #billing-view{display:block;}
             <div style="font-size:13px;font-weight:600;">•••• •••• •••• <span class="mono" data-acct="cardLast4">••••</span></div>
             <div class="text-3" style="font-size:11.5px;margin-top:2px;">Expires <span class="mono" data-acct="cardExp">—</span> · <span data-acct="cardName">—</span></div>
           </div>
-          <button class="btn btn-outline btn-sm" onclick="updatePaymentMethod(this)">Update</button>
+          <button class="btn btn-outline btn-sm" onclick="updatePaymentMethod()">Update</button>
         </div>
         <p class="text-3" style="font-size:11px;margin-top:11px;">Card details are held by the payment processor. Rustex only ever stores the last four digits and the expiry.</p>
       </div>
@@ -2334,93 +2286,10 @@ body.billing #billing-view{display:block;}
 // subscription, an invoice or a saved card. Demo mode is opt-in and labelled.
 const RX_PREFS = 'rustex.prefs.v1';
 const PLANS = {
-  scout:  { id:'scout',  name:'Scout',  monthly:4.99,  yearly:49.90  },
-  raider: { id:'raider', name:'Raider', monthly:9.99,  yearly:99.90  },
-  clan:   { id:'clan',   name:'Clan',   monthly:19.99, yearly:199.90 }
+  scout:  { id:'scout',  name:'Scout',  monthly:4.99,  yearly:47.90  },
+  raider: { id:'raider', name:'Raider', monthly:9.99,  yearly:95.90  },
+  clan:   { id:'clan',   name:'Clan',   monthly:19.99, yearly:191.90 }
 };
-
-// ---------------------------------------------------------------------------
-// Backend
-//
-// This page is a client of the Rustex API — the same backend the React app uses.
-// Auth, subscriptions and billing are all served from there, so there is exactly
-// one place that decides who is signed in and what they have paid for.
-//
-// Set the origin below (or define window.RUSTEX_API_BASE before this script) to
-// wherever the API is deployed. It cannot be same-origin: Vercel serves this file
-// statically and cannot run the .NET API.
-// ---------------------------------------------------------------------------
-const API_BASE = (window.RUSTEX_API_BASE || 'http://localhost:8080').replace(/\/$/, '');
-const API_CONFIGURED = /^https?:\/\/.+/i.test(API_BASE);
-
-const TOKENS = {
-  access:  'rustex.accessToken',
-  refresh: 'rustex.refreshToken',
-  get(){ try { return { access: localStorage.getItem(this.access), refresh: localStorage.getItem(this.refresh) }; }
-         catch { return { access:null, refresh:null }; } },
-  set(access, refresh){ try { localStorage.setItem(this.access, access); localStorage.setItem(this.refresh, refresh); } catch {} },
-  clear(){ try { localStorage.removeItem(this.access); localStorage.removeItem(this.refresh); } catch {} }
-};
-
-/** Thrown for any non-2xx so callers can branch on status instead of parsing text. */
-class ApiError extends Error {
-  constructor(status, body){
-    super((body && (body.message || body.error)) || ('Request failed (' + status + ')'));
-    this.status = status;
-    this.body = body || null;
-  }
-}
-
-let refreshInFlight = null;
-
-/** Swaps the refresh token for a new pair. Shared so a burst of 401s triggers one refresh,
- *  not one per request — the server rotates refresh tokens, so concurrent attempts would
- *  invalidate each other and log the user out. */
-async function refreshTokens(){
-  const { refresh } = TOKENS.get();
-  if(!refresh) return null;
-  try {
-    const r = await fetch(API_BASE + '/api/auth/refresh', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ refreshToken: refresh })
-    });
-    if(!r.ok){ TOKENS.clear(); return null; }
-    const j = await r.json();
-    TOKENS.set(j.accessToken, j.refreshToken);
-    return j.accessToken;
-  } catch { return null; }
-}
-
-/** Calls the API with the bearer token, retrying once after a token refresh. */
-async function api(path, options){
-  if(!API_CONFIGURED) throw new ApiError(0, { message:'The Rustex API address is not configured for this deployment.' });
-
-  const opts = options || {};
-  const send = async token => {
-    const headers = Object.assign({}, opts.headers);
-    if(opts.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
-    if(token) headers['Authorization'] = 'Bearer ' + token;
-    return fetch(API_BASE + path, {
-      method: opts.method || 'GET',
-      headers,
-      body: opts.body ? JSON.stringify(opts.body) : undefined
-    });
-  };
-
-  let res = await send(TOKENS.get().access);
-
-  if(res.status === 401 && TOKENS.get().refresh){
-    refreshInFlight = refreshInFlight || refreshTokens().finally(()=>{ refreshInFlight = null; });
-    const fresh = await refreshInFlight;
-    if(fresh) res = await send(fresh);
-  }
-
-  if(res.status === 204) return null;
-
-  let body = null;
-  try { body = await res.json(); } catch {}
-  if(!res.ok) throw new ApiError(res.status, body);
-  return body;
-}
 const DEFAULT_PREFS = { raid:true, call:true, shop:true, decay:true, team:false, email:false,
                         timezone:'UTC', appearance:'dark', displayName:'' };
 
@@ -2430,8 +2299,7 @@ const Session = {
   prefs: { ...DEFAULT_PREFS },
   servers: [],         // only ever what pairing actually returns
   rustPlus: { connected:false, name:null },
-  plan: null,          // from the API — a paid subscription or a granted comp; never client-set
-  subscription: null,  // full billing detail behind the plan, for the billing page
+  plan: null,          // from /api/auth/me — either a server-granted comp, or null; never client-set
   invoices: [],
   card: null,
 
@@ -2447,34 +2315,11 @@ const Session = {
     syncAuthUI();
   },
   async refresh(){
-    if(!TOKENS.get().access){ this.user = null; this.plan = null; syncAuthUI(); return null; }
     try {
-      // Two calls because they answer different questions: who you are, and what you have paid
-      // for. Both come from the server — the client never asserts its own plan.
-      const [me, sub] = await Promise.all([
-        api('/api/users/me'),
-        api('/api/billing/subscription').catch(e => { if(e.status === 401) throw e; return null; })
-      ]);
-      this.user = me ? {
-        id: me.id,
-        steamId: me.steamId || null,
-        name: me.displayName || me.username || null,
-        avatar: me.avatarUrl || null,
-        profileUrl: me.steamId ? 'https://steamcommunity.com/profiles/' + me.steamId : null,
-        created: me.createdAt || null
-      } : null;
-      this.subscription = sub;
-      // Entitlement is whatever the server says it is. A cancelled-but-still-in-period plan
-      // still entitles, which is why this reads isEntitled rather than checking the status.
-      this.plan = (sub && sub.isEntitled)
-        ? { id: sub.tier, name: sub.planName, source: sub.isComplimentary ? 'comp' : 'stripe' }
-        : null;
-    } catch(err) {
-      // A 401 that survived the refresh means the session is genuinely gone. Anything else is
-      // the API being unreachable — keep the tokens so a transient outage doesn't sign them out.
-      if(err.status === 401) TOKENS.clear();
-      this.user = null; this.plan = null; this.subscription = null;
-    }
+      const r = await fetch('/api/auth/me', { credentials:'same-origin', cache:'no-store' });
+      if(r.ok){ const j = await r.json(); this.user = j.user; this.plan = j.plan || null; }
+      else { this.user = null; this.plan = null; }
+    } catch { this.user = null; this.plan = null; }   // opened from file:// or the API is down
     syncAuthUI();
     return this.user;
   },
@@ -2540,7 +2385,7 @@ function goSettings(){
 }
 function goBilling(){
   if(!requireSignIn('billing')) return;
-  showView('billing'); loadBilling();
+  showView('billing'); renderBilling();
 }
 // The dashboard is the gated surface: signed out -> sign in, signed in but unpaid -> pricing.
 function goDashboard(){
@@ -2629,45 +2474,18 @@ function authPhase(phase){
   document.getElementById('steamAuthError').hidden = phase !== 'error';
 }
 function runSteamAuth(){
-  if(!API_CONFIGURED){
-    authPhase('error');
-    document.getElementById('steamErrBody').textContent =
-      'The Rustex API address is not configured for this deployment, so sign-in cannot start.';
-    return;
-  }
   authPhase('busy');
-  // Remember where they were heading; the callback has no way to carry it, since the API
-  // controls that redirect and only knows the one configured frontend URL.
-  try { sessionStorage.setItem('rustex.authIntent', authIntent || 'dash'); } catch {}
-  // Full-page redirect: Steam will not render in an iframe or a popup we control.
-  window.location.href = API_BASE + '/api/auth/steam/login';
-}
-
-/** Reads the token pair the API hands back after Steam verifies the user.
- *  Returns true if this load was an auth callback. */
-function consumeAuthCallback(){
-  const err = new URLSearchParams(location.search).get('error');
-  if(err){ history.replaceState(null,'', location.pathname); showAuthError(err); return true; }
-
-  // Tokens arrive in the fragment so they never reach server logs.
-  const frag = new URLSearchParams(location.hash.replace(/^#/, ''));
-  const access = frag.get('access_token'), refresh = frag.get('refresh_token');
-  if(!access || !refresh) return false;
-
-  TOKENS.set(access, refresh);
-  // Scrub immediately — the browser keeps the fragment in history otherwise, so it would sit
-  // in the address bar and come back on the back button.
-  history.replaceState(null,'', location.pathname);
-  return true;
+  const next = authIntent && /^[a-z]+$/.test(authIntent) ? '?next=' + authIntent : '';
+  // full-page redirect: Steam will not render in an iframe or a popup we control
+  window.location.href = '/api/auth/steam' + next;
 }
 const STEAM_ERRORS = {
-  cancelled:            'You cancelled the sign-in on Steam, or Steam declined the request.',
-  invalid_signature:    'Steam could not confirm that response was genuine. Please try again.',
-  steam_unreachable:    'Steam did not answer. Their service may be down — try again shortly.',
-  bad_identity:         'Steam returned an identity we could not read.',
-  not_configured:       'Steam verified you, but this deployment is missing its signing key, so it can\'t issue a session.',
-  server_error:         'Steam verified you, but the sign-in callback failed. Check the API logs for the cause.',
-  steam_already_linked: 'That Steam account is already linked to a different Rustex account.'
+  cancelled:        'You cancelled the sign-in on Steam, or Steam declined the request.',
+  invalid_signature:'Steam could not confirm that response was genuine. Please try again.',
+  steam_unreachable:'Steam did not answer. Their service may be down — try again shortly.',
+  bad_identity:     'Steam returned an identity we could not read.',
+  not_configured:   'Steam verified you, but this deployment has no SESSION_SECRET set, so it can\'t issue a session. Set it in the hosting environment variables and redeploy.',
+  server_error:     'Steam verified you, but the sign-in callback failed. Check the function logs for the cause.'
 };
 function showAuthError(code){
   openSteamAuth();
@@ -2692,45 +2510,11 @@ function renderPricing(){
     per.textContent = billingCycle === 'yearly' ? '/ month, billed yearly' : '/ month';
   });
 }
-/** Starts Stripe Checkout, or moves an existing subscription between tiers.
- *  Card details are entered on Stripe's own hosted page — they never touch this origin. */
-async function choosePlan(planId, btn){
+// No payment provider is connected, so this cannot take money and must not claim to.
+function choosePlan(planId){
   if(!Session.signedIn){ openSteamAuth('pricing'); return; }
-
-  const sub = Session.subscription;
-  if(sub && sub.isComplimentary){
-    fireCustomToast('You already have access', 'Complimentary access can\'t be changed from here.', 'i-lock');
-    return;
-  }
-
-  const interval = billingCycle === 'yearly' ? 'Yearly' : 'Monthly';
-  const changing = !!(sub && sub.isEntitled);
-  const done = busyButton(btn, changing ? 'Switching…' : 'Opening checkout…');
-
-  try {
-    if(changing){
-      await api('/api/billing/change-plan', { method:'POST', body:{ tier: planId, interval } });
-      await Session.refresh();
-      await loadBilling();
-      fireCustomToast('Plan updated', 'You are now on ' + PLANS[planId].name + '.', 'i-check');
-      goBilling();
-    } else {
-      const r = await api('/api/billing/checkout', { method:'POST', body:{ tier: planId, interval } });
-      window.location.href = r.url;   // hosted Stripe Checkout
-    }
-  } catch(err){
-    fireCustomToast(err.status === 409 ? 'Can\'t do that yet' : 'Checkout failed', err.message, 'i-lock');
-  } finally { done(); }
-}
-
-/** Disables a button and shows progress for the duration of a request, so a slow network
- *  can't be double-submitted into two subscriptions. Returns a restore function. */
-function busyButton(btn, label){
-  if(!btn) return ()=>{};
-  const original = btn.innerHTML, wasDisabled = btn.disabled;
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spin" aria-hidden="true"></span>' + (label || 'Working…');
-  return ()=>{ btn.disabled = wasDisabled; btn.innerHTML = original; };
+  fireCustomToast('Checkout is not connected yet',
+    PLANS[planId].name + ' can\'t be purchased until a payment provider is wired up.', 'i-lock');
 }
 function enterDemo(){
   if(!Session.signedIn){ openSteamAuth('dashboard'); return; }
@@ -2802,48 +2586,30 @@ function unpairServer(id){
 }
 
 // ---- billing ----
-// Everything here is mirrored from Stripe via the API. Nothing is invented: an account that
-// has never been charged genuinely has no invoices and no card, and says so.
-const INVOICE_PILL = { Paid:'pill-online', Open:'pill-warn', Draft:'pill-offline', Void:'pill-offline', Uncollectible:'pill-offline' };
-
+// Nothing here invents a record. With no provider connected the honest answer is
+// "no subscription, no card, no invoices" — so that is exactly what it shows.
 function renderBilling(){
   const rows = document.getElementById('invoiceRows');
   const empty = document.getElementById('invoiceEmpty');
   const table = document.getElementById('invoiceTable');
   const count = document.getElementById('invoiceCount');
   if(rows){
-    rows.innerHTML = Session.invoices.map(v => {
-      const amount = money(((v.amountPaidCents || v.amountDueCents || 0) / 100));
-      const pill = INVOICE_PILL[v.status] || 'pill-offline';
-      // Stripe hosts the document — we link to its copy rather than rendering our own, since
-      // theirs is the actual record.
-      const link = v.hostedInvoiceUrl
-        ? '<a class="btn btn-ghost btn-sm" href="' + v.hostedInvoiceUrl + '" target="_blank" rel="noopener">View</a>'
-        : '<span class="muted">—</span>';
-      return '<tr><td class="mono">' + escapeHtml(v.number || v.id) + '</td><td>' + fmtDate(v.issuedAt)
-        + '</td><td>' + escapeHtml(Session.plan ? Session.plan.name : '—')
-        + '</td><td class="mono">' + amount + '</td><td><span class="pill ' + pill + '"><span class="dot"></span>'
-        + escapeHtml(v.status) + '</span></td><td style="text-align:right">' + link + '</td></tr>';
-    }).join('');
+    rows.innerHTML = Session.invoices.map(v =>
+      '<tr><td class="mono">' + v.id + '</td><td>' + fmtDate(v.date) + '</td><td>' + v.plan
+      + '</td><td class="mono">' + money(v.amount) + '</td><td><span class="pill pill-online"><span class="dot"></span>'
+      + v.status + '</span></td><td style="text-align:right"><button class="btn btn-ghost btn-sm" onclick="downloadInvoice(\'' + v.id + '\')">Download</button></td></tr>'
+    ).join('');
     table.style.display = Session.invoices.length ? '' : 'none';
     empty.style.display = Session.invoices.length ? 'none' : '';
-    count.textContent = Session.invoices.length
-      ? Session.invoices.length + (Session.invoices.length === 1 ? ' invoice' : ' invoices') : '';
+    count.textContent = Session.invoices.length ? Session.invoices.length + ' invoices' : '';
   }
-
-  const sub = Session.subscription;
   const p = Session.plan, isComp = !!(p && p.source === 'comp'), has = !!p;
   const active = document.getElementById('billingActive');
   if(active) active.hidden = !has;
-
-  // A comp grant has no subscription behind it, so cancel/reactivate have nothing to act on.
-  // Reactivate additionally only makes sense while a cancellation is actually pending.
-  document.querySelectorAll('[data-bill]').forEach(b => {
-    if(!has || isComp){ b.hidden = true; return; }
-    const pending = !!(sub && sub.cancelAtPeriodEnd);
-    b.hidden = b.dataset.bill === 'reactivate' ? !pending : pending;
-  });
-
+  // Upgrade/downgrade/cancel/reactivate all assume a real subscription behind the
+  // plan. A comp grant has none of that to act on, so the buttons come off rather
+  // than wiring them to actions that would lie about what they did.
+  document.querySelectorAll('[data-bill]').forEach(b => b.hidden = !has || isComp);
   const none = document.getElementById('billingNone');
   if(none) none.hidden = has;
   const card = document.getElementById('billingCard');
@@ -2852,79 +2618,10 @@ function renderBilling(){
   if(noCard) noCard.hidden = !!Session.card || isComp;
   const compNote = document.getElementById('billingCompNote');
   if(compNote) compNote.hidden = !isComp;
-
-  if(Session.card){
-    const set = (sel, text) => { const el = document.querySelector(sel); if(el) el.textContent = text; };
-    set('[data-acct="cardBrand"]', Session.card.brand || 'Card');
-    set('[data-acct="cardLast4"]', Session.card.last4 ? '•••• ' + Session.card.last4 : '');
-    set('[data-acct="cardExp"]', (Session.card.expMonth && Session.card.expYear)
-      ? String(Session.card.expMonth).padStart(2,'0') + '/' + Session.card.expYear : '');
-  }
 }
-
-/** Invoice numbers and statuses come from Stripe, so they are escaped before being
- *  interpolated rather than trusted as safe markup. */
-function escapeHtml(value){
-  return String(value == null ? '' : value)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-/** Cancels at period end — they keep the access they already paid for. */
-async function cancelSub(btn){
-  const sub = Session.subscription;
-  if(!sub || !sub.hasSubscription){ fireCustomToast('No active subscription', 'There is nothing to cancel.', 'i-lock'); return; }
-  if(sub.isComplimentary){ fireCustomToast('Complimentary access', 'There is no subscription to cancel.', 'i-lock'); return; }
-  if(!confirm('Cancel your subscription? You keep full access until the end of the period you have already paid for.')) return;
-
-  const done = busyButton(btn, 'Cancelling…');
-  try {
-    await api('/api/billing/cancel', { method:'POST', body:{ immediately:false } });
-    await Session.refresh();
-    await loadBilling();
-    fireCustomToast('Subscription cancelled', 'Access continues until the end of your current period.', 'i-check');
-  } catch(err){ fireCustomToast('Could not cancel', err.message, 'i-lock'); }
-  finally { done(); }
-}
-
-/** Undoes a pending end-of-period cancellation. */
-async function reactivateSub(btn){
-  const done = busyButton(btn, 'Restoring…');
-  try {
-    await api('/api/billing/resume', { method:'POST' });
-    await Session.refresh();
-    await loadBilling();
-    fireCustomToast('Subscription restored', 'Your plan will renew as normal.', 'i-check');
-  } catch(err){ fireCustomToast('Could not restore', err.message, 'i-lock'); }
-  finally { done(); }
-}
-
-/** Sends them to Stripe's hosted billing portal. Deliberately a redirect rather than a card
- *  form of our own — that is what keeps card data off this origin entirely. */
-async function updatePaymentMethod(btn){
-  const done = busyButton(btn, 'Opening…');
-  try {
-    const r = await api('/api/billing/payment-method', { method:'POST' });
-    window.location.href = r.url;
-  } catch(err){
-    fireCustomToast('Could not open billing portal', err.message, 'i-lock');
-    done();
-  }
-}
-
-/** Pulls invoices and the saved card. Both are genuinely empty for accounts that have never
- *  been charged, including complimentary ones. */
-async function loadBilling(){
-  if(!Session.signedIn){ Session.invoices = []; Session.card = null; renderBilling(); return; }
-  try {
-    const [invoices, card] = await Promise.all([
-      api('/api/billing/invoices?limit=25').catch(()=>[]),
-      api('/api/billing/payment-method').catch(()=>null)
-    ]);
-    Session.invoices = Array.isArray(invoices) ? invoices : [];
-    Session.card = card;
-  } catch { Session.invoices = []; Session.card = null; }
-  renderBilling();
-}
+function cancelSub(){ fireCustomToast('No active subscription', 'There is nothing to cancel yet.', 'i-lock'); }
+function reactivateSub(){ fireCustomToast('No subscription', 'Pick a plan once checkout is connected.', 'i-lock'); }
+function updatePaymentMethod(){ fireCustomToast('Payments not connected', 'No payment provider is wired up yet.', 'i-lock'); }
 function downloadInvoice(id){
   const v = Session.invoices.find(x => x.id === id); if(!v) return;
   const line = (k, val) => k.padEnd(20) + val;
@@ -2943,14 +2640,7 @@ function downloadInvoice(id){
 // ---- logout ----
 async function logOut(){
   try { await fetch('/api/auth/logout', { method:'POST', credentials:'same-origin' }); } catch {}
-  // Best-effort revoke so the refresh token stops working server-side too; the local clear
-  // below happens either way, so a network failure still logs them out of this browser.
-  const { refresh } = TOKENS.get();
-  if(refresh) api('/api/auth/logout', { method:'POST', body:{ refreshToken: refresh } }).catch(()=>{});
-  TOKENS.clear();
-
-  Session.user = null; Session.plan = null; Session.subscription = null;
-  Session.invoices = []; Session.card = null;
+  Session.user = null;
   Session.setDemo(false);
   Session.servers = []; Session.rustPlus = { connected:false, name:null };
   document.body.classList.remove('dash','pairing','pricing','settings','billing');
@@ -2973,39 +2663,7 @@ async function logOut(){
     history.replaceState(null,'', location.pathname + location.hash);
   }
 
-  // Returning from Steam? Store the tokens before anything asks who we are. This also
-  // consumes the fragment, so it must run before the hash is read for routing below.
-  const cameFromAuth = consumeAuthCallback();
-
-  // Returning from Stripe Checkout: the webhook is what actually activates the subscription,
-  // and it can land a moment after the browser does — so retry briefly rather than telling
-  // someone who just paid that they have no plan.
-  const checkout = qs.get('checkout');
-  if(checkout) history.replaceState(null,'', location.pathname + location.hash);
-
   await Session.refresh();
-
-  if(checkout === 'success'){
-    for(let i = 0; i < 5 && !Session.entitled; i++){
-      await new Promise(r => setTimeout(r, 1200));
-      await Session.refresh();
-    }
-    fireCustomToast(
-      Session.entitled ? 'Subscription active' : 'Payment received',
-      Session.entitled ? 'Your plan is live — welcome aboard.' : 'Activation is taking a moment. Refresh shortly if the dashboard is still locked.',
-      'i-check');
-  } else if(checkout === 'cancelled'){
-    fireCustomToast('Checkout cancelled', 'Nothing was charged.', 'i-lock');
-  }
-
-  // After signing in, go where they were originally headed rather than dumping them on the
-  // landing page — the intent was stashed before the redirect to Steam.
-  if(cameFromAuth && Session.signedIn){
-    let intent = 'dash';
-    try { intent = sessionStorage.getItem('rustex.authIntent') || 'dash'; sessionStorage.removeItem('rustex.authIntent'); } catch {}
-    if(intent === 'dashboard') intent = 'dash';
-    location.hash = '#' + intent;
-  }
 
   const h = location.hash;
   const want = h.replace('#','');
@@ -3021,7 +2679,7 @@ async function logOut(){
 
   if(document.body.classList.contains('pricing')) renderPricing();
   if(document.body.classList.contains('settings')){ loadSettingsForm(); renderSettings(); }
-  if(document.body.classList.contains('billing')) loadBilling();
+  if(document.body.classList.contains('billing')) renderBilling();
   if(document.body.classList.contains('pairing')) renderPairedServers();
 })();
 

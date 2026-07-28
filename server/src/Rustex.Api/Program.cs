@@ -10,10 +10,8 @@ using Rustex.Api.Hubs;
 using Rustex.Api.Middleware;
 using Rustex.Api.Startup;
 using Rustex.Domain.Abstractions;
-using Rustex.Domain.Billing;
 using Rustex.Domain.RustPlus;
 using Rustex.Infrastructure.Auth;
-using Rustex.Infrastructure.Billing;
 using Rustex.Infrastructure.Caching;
 using Rustex.Infrastructure.Emergency;
 using Rustex.Infrastructure.EventIngestion;
@@ -200,18 +198,6 @@ builder.Services.AddSingleton<ILiveSyncPublisher, LiveSyncPublisher>();
 builder.Services.AddHostedService<SyncRetryWorker>();
 builder.Services.AddScoped<ILiveScopeAuthorizer, LiveScopeAuthorizer>();
 
-// ---------- Billing ----------
-builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
-builder.Services.AddSingleton<IPaymentProvider, StripePaymentProvider>();
-builder.Services.AddSingleton<IWebhookVerifier, StripeWebhookVerifier>();
-builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
-
-// Operator-granted plans, keyed by SteamID. Replaces the static site's COMPED_ACCOUNTS env var
-// with a real Subscription row that can be listed and revoked.
-builder.Services.Configure<ComplimentaryGrantOptions>(
-    builder.Configuration.GetSection(ComplimentaryGrantOptions.SectionName));
-builder.Services.AddScoped<IComplimentaryGrantReconciler, ComplimentaryGrantReconciler>();
-builder.Services.AddHostedService<ComplimentaryGrantStartupWorker>();
 
 builder.Services.AddSingleton<IClientConnectionRegistry, InMemoryClientConnectionRegistry>();
 builder.Services.AddHttpClient<IDiscordWebhookSender, DiscordWebhookSender>();

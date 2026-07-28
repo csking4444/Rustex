@@ -10,7 +10,6 @@ import {
   Settings,
   ChevronsLeft,
   Radio,
-  CreditCard,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { RustexMark } from "@/components/brand/RustexMark";
@@ -24,7 +23,6 @@ const NAV_ITEMS = [
   { to: "/events", label: "Events", icon: CalendarClock },
   { to: "/teams", label: "Teams", icon: Users },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/billing", label: "Billing", icon: CreditCard },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

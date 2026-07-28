@@ -1,7 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
-import { EntitledRoute } from "@/routes/EntitledRoute";
 import LandingPage from "@/pages/LandingPage";
 import LoginPage from "@/pages/LoginPage";
 import AuthCallbackPage from "@/pages/AuthCallbackPage";
@@ -14,7 +13,6 @@ import EventsPage from "@/pages/EventsPage";
 import TeamsPage from "@/pages/TeamsPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import SettingsPage from "@/pages/SettingsPage";
-import BillingPage from "@/pages/BillingPage";
 import AcceptInvitePage from "@/pages/AcceptInvitePage";
 
 export default function App() {
@@ -28,14 +26,8 @@ export default function App() {
         <Route path="/teams/invite/:token" element={<AcceptInvitePage />} />
 
         <Route element={<AppLayout />}>
-          {/* Reachable without a plan — otherwise someone whose subscription lapsed would have
-              no route to the page where they could fix it. */}
-          <Route path="/billing" element={<BillingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
 
-          {/* The paid product. Every endpoint these pages call re-checks entitlement server-side;
-              this gate only saves the user from a screen full of 402s. */}
-          <Route element={<EntitledRoute />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/servers" element={<ServersPage />} />
             <Route path="/maps" element={<MapsPage />} />
@@ -44,7 +36,6 @@ export default function App() {
             <Route path="/events" element={<EventsPage />} />
             <Route path="/teams" element={<TeamsPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
-          </Route>
         </Route>
       </Route>
 
